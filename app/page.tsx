@@ -17,10 +17,7 @@ export default function Page() {
   className={styles.shape}
 />
           <p className={`${lusitana.className} text-xl text-gray-800 md:text-3xl md:leading-normal`}>
-            <strong>Welcome to Project Portal.</strong> Your client's files, your branding.{' '}
-            <a href="https://nextjs.org/learn/" className="text-blue-500">
-              Next.js Learn Course
-            </a>
+            <strong>Welcome to Project Portal.</strong> An all in one place for your project - presented with your brand.
             
           </p>
           <Link
@@ -33,7 +30,7 @@ export default function Page() {
         <div className="flex items-center justify-center p-6 md:w-3/5 md:px-28 md:py-12">
           {/* Add Hero Images Here */}
           <Image
-            src="/hero-desktop.png"
+            src="/conceptImage.png"
             alt="Hero"
             width={1000}
             height={760}
