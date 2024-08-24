@@ -13,10 +13,14 @@ const config: Config = {
       },
       colors: {
         blue: {
+          100: '#042540',
           400: '#2589FE',
           500: '#0070F3',
           600: '#2F6FEB',
         },
+        yellow: {
+          100: '#c09f4a',
+        }
       },
     },
     keyframes: {
@@ -30,3 +34,6 @@ const config: Config = {
   plugins: [require('@tailwindcss/forms')],
 };
 export default config;
+
+// tailwind.config.js
+
