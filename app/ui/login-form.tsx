@@ -1,6 +1,5 @@
 'use client';
  
-import { lusitana } from '@/app/ui/fonts';
 import {
   AtSymbolIcon,
   KeyIcon,
@@ -23,7 +22,7 @@ export default function LoginForm() {
       <p className ="text-white">On this platform, you will be able to be up-to-date with your custom home building
 or home renovation project. You can access all your documentation, contracts,
 budget, permit info, progress photos, schedules and more.</p>
-        <h1 className={`${lusitana.className} mb-3 text-2xl text-white`}>
+        <h1 className={`mb-3 text-2xl text-white`}>
           Please log in to continue.
         </h1>
         <div className="w-full">

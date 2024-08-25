@@ -11,7 +11,7 @@ export default function Header() {
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <Link legacyBehavior href="/">
           <a>
-            <Image src="/logo.png" alt="Logo" width={100} height={50} />
+            <Image src="/logoWhite.png" alt="Logo" width={240} height={44.856} />
           </a>
         </Link>
         <div style={{ borderLeft: '1px solid #c09f4a', height: '50px', margin: '0 10px' }}></div>
