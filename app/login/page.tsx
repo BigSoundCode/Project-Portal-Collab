@@ -8,7 +8,7 @@ export default function LoginPage() {
       <div className="relative mx-auto flex w-full max-w-[400px] flex-col space-y-2.5 p-4 md:-mt-32">
         <div className="flex h-20 w-full items-end  p-3 md:h-36">
           <div>
-            <Image src="/logoWhite.png" alt="Acme Logo" width={442} height={180} />
+            <Image src="/Logo-big.webp" alt="Acme Logo" width={442} height={180} />
           </div>
         </div>
         <LoginForm />
