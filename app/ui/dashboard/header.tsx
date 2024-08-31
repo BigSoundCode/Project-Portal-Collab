@@ -17,10 +17,10 @@ export default function Header() {
         <div style={{ borderLeft: '1px solid #c09f4a', height: '50px', margin: '0 10px' }}></div>
         <h1 style={{ fontWeight: 'bold' }}>Customer Portal</h1>
         <div style={{ marginLeft: 'auto' }}>
-          <button>
+          <button style={{ paddingLeft: '10px', paddingRight: '10px' }}>
             <Image src="/menu.png" alt="B1" width={30} height={30}/>
           </button>
-          <button>
+          <button style={{ paddingLeft: '10px', paddingRight: '10px' }}>
             <Image src="/user.png" alt="B2" width={30} height={30} />
           </button>
         </div>
