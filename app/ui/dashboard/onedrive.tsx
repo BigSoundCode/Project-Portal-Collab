@@ -37,7 +37,7 @@ const OneDrive: React.FC = () => {
   const generateCodeVerifier = () => {
     const array = new Uint8Array(32);
     window.crypto.getRandomValues(array);
-    return btoa(String.fromCharCode.apply(null, array))
+    return btoa(String.fromCharCode(...array))
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=/g, '')
