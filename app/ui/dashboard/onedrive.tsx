@@ -137,6 +137,7 @@ const OneDrive: React.FC = () => {
         await fetchItems(accessToken);
         window.history.replaceState({}, document.title, window.location.pathname);
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
         setAuthState({ isAuthenticated: false, accessToken: null, error: error.message });
       } finally {
         setIsLoading(false);
