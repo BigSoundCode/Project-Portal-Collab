@@ -1,14 +1,9 @@
-import { Card } from '@/app/ui/dashboard/cards';
-import RevenueChart from '@/app/ui/dashboard/revenue-chart';
-import LatestInvoices from '@/app/ui/dashboard/latest-invoices';
-import CardWrapper from '@/app/ui/dashboard/cards';
-import { Suspense } from 'react';
-import { RevenueChartSkeleton, LatestInvoicesSkeleton, CardsSkeleton } from '@/app/ui/skeletons';
+'use client'
+
+import React from 'react';
 import OneDrive from '@/app/ui/dashboard/onedrive';
 
- 
-export default async function Page() {
-  
+export default function Page() {
   const selectedNavItem = 'home'; // Replace 'home' with the selected side-nav button name
 
   return (
@@ -17,15 +12,12 @@ export default async function Page() {
         {selectedNavItem.charAt(0).toUpperCase() + selectedNavItem.slice(1)}
       </h1>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        
+        {/* Your grid content here */}
       </div>
 
       <div>
         <OneDrive />
       </div>
-
-
-      
     </main>
   );
 }
