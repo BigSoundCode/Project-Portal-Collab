@@ -14,10 +14,11 @@ interface AuthState {
   error: string | null;
 }
 
-interface File {
+interface DriveItem {
   id: string;
   name: string;
-  webUrl: string;
+  folder?: { childCount: number };
+  file?: { mimeType: string };
 }
 
 const OneDrive: React.FC = () => {
@@ -26,7 +27,9 @@ const OneDrive: React.FC = () => {
     accessToken: null,
     error: null,
   });
-  const [files, setFiles] = useState<File[]>([]);
+  const [items, setItems] = useState<DriveItem[]>([]);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [folderPath, setFolderPath] = useState<{ id: string; name: string }[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
   const searchParams = useSearchParams();
@@ -79,27 +82,47 @@ const OneDrive: React.FC = () => {
     return data.accessToken;
   }, []);
 
-  const fetchFiles = useCallback(async (accessToken: string) => {
+  const fetchItems = useCallback(async (accessToken: string, folderId: string | null = null) => {
     setIsLoading(true);
     try {
-      const response = await fetch('https://graph.microsoft.com/v1.0/me/drive/root/children', {
+      const endpoint = folderId
+        ? `https://graph.microsoft.com/v1.0/me/drive/items/${folderId}/children`
+        : 'https://graph.microsoft.com/v1.0/me/drive/root/children';
+
+      const response = await fetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
         },
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch files: ${await response.text()}`);
+        throw new Error(`Failed to fetch items: ${await response.text()}`);
       }
 
       const data = await response.json();
-      setFiles(data.value);
+      setItems(data.value);
+      setCurrentFolderId(folderId);
     } catch (error) {
-      setAuthState(prev => ({ ...prev, error: 'Failed to fetch files' }));
+      setAuthState(prev => ({ ...prev, error: 'Failed to fetch items' }));
     } finally {
       setIsLoading(false);
     }
   }, []);
+
+  const handleFolderClick = useCallback((folderId: string, folderName: string) => {
+    setFolderPath(prev => [...prev, { id: folderId, name: folderName }]);
+    fetchItems(authState.accessToken!, folderId);
+  }, [authState.accessToken, fetchItems]);
+
+  const handleBackClick = useCallback(() => {
+    if (folderPath.length > 0) {
+      const newPath = [...folderPath];
+      newPath.pop();
+      setFolderPath(newPath);
+      const parentFolderId = newPath.length > 0 ? newPath[newPath.length - 1].id : null;
+      fetchItems(authState.accessToken!, parentFolderId);
+    }
+  }, [authState.accessToken, fetchItems, folderPath]);
 
   const handleAuthentication = useCallback(async () => {
     const code = searchParams.get('code');
@@ -111,7 +134,7 @@ const OneDrive: React.FC = () => {
         const accessToken = await exchangeCodeForToken(code, codeVerifier);
         localStorage.setItem('access_token', accessToken);
         setAuthState({ isAuthenticated: true, accessToken, error: null });
-        await fetchFiles(accessToken);
+        await fetchItems(accessToken);
         window.history.replaceState({}, document.title, window.location.pathname);
       } catch (error) {
         setAuthState({ isAuthenticated: false, accessToken: null, error: error.message });
@@ -123,12 +146,12 @@ const OneDrive: React.FC = () => {
       const storedToken = localStorage.getItem('access_token');
       if (storedToken) {
         setAuthState({ isAuthenticated: true, accessToken: storedToken, error: null });
-        fetchFiles(storedToken);
+        fetchItems(storedToken);
       } else {
         setIsLoading(false);
       }
     }
-  }, [searchParams, exchangeCodeForToken, fetchFiles]);
+  }, [searchParams, exchangeCodeForToken, fetchItems]);
 
   useEffect(() => {
     handleAuthentication();
@@ -137,7 +160,9 @@ const OneDrive: React.FC = () => {
   const handleLogout = () => {
     localStorage.removeItem('access_token');
     setAuthState({ isAuthenticated: false, accessToken: null, error: null });
-    setFiles([]);
+    setItems([]);
+    setFolderPath([]);
+    setCurrentFolderId(null);
   };
 
   const downloadFile = async (fileId: string, fileName: string) => {
@@ -185,23 +210,35 @@ const OneDrive: React.FC = () => {
         <button onClick={initiateAuth}>Login with OneDrive</button>
       ) : (
         <div>
-          <h2>OneDrive Files</h2>
+          <h2>OneDrive Items</h2>
           <button onClick={handleLogout}>Logout</button>
-          {files.length === 0 ? (
-            <p>No files found in your OneDrive root.</p>
+          {folderPath.length > 0 && (
+            <div>
+              <button onClick={handleBackClick}>Back</button>
+              <p>Current path: {folderPath.map(folder => folder.name).join(' > ')}</p>
+            </div>
+          )}
+          {items.length === 0 ? (
+            <p>No items found in this folder.</p>
           ) : (
             <ul>
-              {files.map((file) => (
-                <li key={file.id}>
-                  <a 
-                    href="#" 
-                    onClick={(e) => {
-                      e.preventDefault();
-                      downloadFile(file.id, file.name);
-                    }}
-                  >
-                    {file.name}
-                  </a>
+              {items.map((item) => (
+                <li key={item.id}>
+                  {item.folder ? (
+                    <button onClick={() => handleFolderClick(item.id, item.name)}>
+                      📁 {item.name} ({item.folder.childCount} items)
+                    </button>
+                  ) : (
+                    <a 
+                      href="#" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        downloadFile(item.id, item.name);
+                      }}
+                    >
+                      📄 {item.name}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
