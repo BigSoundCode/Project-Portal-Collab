@@ -138,7 +138,7 @@ const OneDrive: React.FC = () => {
         window.history.replaceState({}, document.title, window.location.pathname);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-        setAuthState({ isAuthenticated: false, accessToken: null, error: error.message });
+        setAuthState({ isAuthenticated: false, accessToken: null, error: errorMessage });
       } finally {
         setIsLoading(false);
         localStorage.removeItem('code_verifier');
