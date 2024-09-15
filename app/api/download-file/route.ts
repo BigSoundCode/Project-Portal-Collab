@@ -1,10 +1,12 @@
-// File: app/api/download-file/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
+  console.log('Download file request received');
+
   const fileId = request.nextUrl.searchParams.get('fileId');
   const accessToken = request.headers.get('Authorization')?.split('Bearer ')[1];
+
+  console.log(`File ID: ${fileId}, Access Token exists: ${!!accessToken}`);
 
   if (!fileId || !accessToken) {
     console.error('Missing fileId or access token');
@@ -18,6 +20,8 @@ export async function GET(request: NextRequest) {
         'Authorization': `Bearer ${accessToken}`
       }
     });
+
+    console.log(`OneDrive API response status: ${response.status}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -40,7 +44,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error downloading file:', error);
-    return NextResponse.json({ error: `Failed to download file: ${error.message}` }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return NextResponse.json({ error: `Failed to download file: ${errorMessage}` }, { status: 500 });
   }
 }
-  
