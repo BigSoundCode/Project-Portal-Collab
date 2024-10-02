@@ -1,10 +1,25 @@
 'use client'
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import OneDrive from '@/app/ui/dashboard/onedrive';
 
 export default function Page() {
-  const selectedNavItem = 'home'; // Replace 'home' with the selected side-nav button name
+  const { data: session, status } = useSession();
+  const selectedNavItem = 'home';
+
+  useEffect(() => {
+    console.log('Session status:', status);
+    console.log('Session data:', session);
+  }, [session, status]);
+
+  if (status === 'loading') {
+    return <div>Loading...</div>;
+  }
+
+  if (!session) {
+    return <div>Access Denied</div>;
+  }
 
   return (
     <main>

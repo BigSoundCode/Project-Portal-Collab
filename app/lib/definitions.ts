@@ -2,12 +2,18 @@
 // It describes the shape of the data, and what data type each property should accept.
 // For simplicity of teaching, we're manually defining these types.
 // However, these types are generated automatically if you're using an ORM such as Prisma.
-export type User = {
+import { QueryResultRow } from '@vercel/postgres';
+
+export interface User extends QueryResultRow {
   id: string;
   name: string;
   email: string;
-  password: string;
-};
+  password: string; // Note: Be cautious about including this in client-side code
+  onedrive_folder_id: string | null;
+  is_admin: boolean;
+}
+
+
 
 export type Customer = {
   id: string;

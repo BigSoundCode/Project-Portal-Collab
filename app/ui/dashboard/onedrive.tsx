@@ -1,18 +1,7 @@
 'use client'
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
-
-const CLIENT_ID = '459867de-d646-4804-86dd-af9095ed5fdf';
-const REDIRECT_URI = 'http://localhost:3000/dashboard';
-const AUTH_ENDPOINT = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize';
-const SCOPE = 'files.readwrite offline_access';
-
-interface AuthState {
-  isAuthenticated: boolean;
-  accessToken: string | null;
-  error: string | null;
-}
+import { useSession } from 'next-auth/react';
 
 interface DriveItem {
   id: string;
@@ -22,65 +11,12 @@ interface DriveItem {
 }
 
 const OneDrive: React.FC = () => {
-  const [authState, setAuthState] = useState<AuthState>({
-    isAuthenticated: false,
-    accessToken: null,
-    error: null,
-  });
+  const { data: session, status } = useSession();
   const [items, setItems] = useState<DriveItem[]>([]);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [folderPath, setFolderPath] = useState<{ id: string; name: string }[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  
-  const searchParams = useSearchParams();
-
-  const generateCodeVerifier = () => {
-    const array = new Uint8Array(32);
-    window.crypto.getRandomValues(array);
-    return btoa(String.fromCharCode(...array))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '')
-      .substr(0, 128);
-  };
-
-  const generateCodeChallenge = async (codeVerifier: string) => {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(codeVerifier);
-    const digest = await window.crypto.subtle.digest('SHA-256', data);
-    return btoa(String.fromCharCode(...new Uint8Array(digest)))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
-  };
-
-  const initiateAuth = useCallback(async () => {
-    const codeVerifier = generateCodeVerifier();
-    localStorage.setItem('code_verifier', codeVerifier);
-    
-    const codeChallenge = await generateCodeChallenge(codeVerifier);
-    const authUrl = `${AUTH_ENDPOINT}?client_id=${CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(SCOPE)}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
-    
-    window.location.href = authUrl;
-  }, []);
-
-  const exchangeCodeForToken = useCallback(async (code: string, codeVerifier: string) => {
-    const response = await fetch('/api/token-exchange', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ code, codeVerifier }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(`Failed to exchange code for token: ${JSON.stringify(data)}`);
-    }
-
-    return data.accessToken;
-  }, []);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchItems = useCallback(async (accessToken: string, folderId: string | null = null) => {
     setIsLoading(true);
@@ -88,22 +24,30 @@ const OneDrive: React.FC = () => {
       const endpoint = folderId
         ? `https://graph.microsoft.com/v1.0/me/drive/items/${folderId}/children`
         : 'https://graph.microsoft.com/v1.0/me/drive/root/children';
-
+  
+      console.log('Fetching from endpoint:', endpoint);
+  
       const response = await fetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
         },
       });
-
+  
+      console.log('Response status:', response.status);
+  
       if (!response.ok) {
-        throw new Error(`Failed to fetch items: ${await response.text()}`);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`Failed to fetch items: ${response.status} ${errorText}`);
       }
-
+  
       const data = await response.json();
+      console.log('Fetched data:', data);
       setItems(data.value);
       setCurrentFolderId(folderId);
     } catch (error) {
-      setAuthState(prev => ({ ...prev, error: 'Failed to fetch items' }));
+      console.error('Error in fetchItems:', error);
+      setError(error instanceof Error ? error.message : 'An unknown error occurred');
     } finally {
       setIsLoading(false);
     }
@@ -111,8 +55,8 @@ const OneDrive: React.FC = () => {
 
   const handleFolderClick = useCallback((folderId: string, folderName: string) => {
     setFolderPath(prev => [...prev, { id: folderId, name: folderName }]);
-    fetchItems(authState.accessToken!, folderId);
-  }, [authState.accessToken, fetchItems]);
+    fetchItems(session?.accessToken as string, folderId);
+  }, [session, fetchItems]);
 
   const handleBackClick = useCallback(() => {
     if (folderPath.length > 0) {
@@ -120,59 +64,23 @@ const OneDrive: React.FC = () => {
       newPath.pop();
       setFolderPath(newPath);
       const parentFolderId = newPath.length > 0 ? newPath[newPath.length - 1].id : null;
-      fetchItems(authState.accessToken!, parentFolderId);
+      fetchItems(session?.accessToken as string, parentFolderId);
     }
-  }, [authState.accessToken, fetchItems, folderPath]);
-
-  const handleAuthentication = useCallback(async () => {
-    const code = searchParams.get('code');
-    const codeVerifier = localStorage.getItem('code_verifier');
-
-    if (code && codeVerifier) {
-      try {
-        setIsLoading(true);
-        const accessToken = await exchangeCodeForToken(code, codeVerifier);
-        localStorage.setItem('access_token', accessToken);
-        setAuthState({ isAuthenticated: true, accessToken, error: null });
-        await fetchItems(accessToken);
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-        setAuthState({ isAuthenticated: false, accessToken: null, error: errorMessage });
-      } finally {
-        setIsLoading(false);
-        localStorage.removeItem('code_verifier');
-      }
-    } else {
-      const storedToken = localStorage.getItem('access_token');
-      if (storedToken) {
-        setAuthState({ isAuthenticated: true, accessToken: storedToken, error: null });
-        fetchItems(storedToken);
-      } else {
-        setIsLoading(false);
-      }
-    }
-  }, [searchParams, exchangeCodeForToken, fetchItems]);
+  }, [session, fetchItems, folderPath]);
 
   useEffect(() => {
-    handleAuthentication();
-  }, [handleAuthentication]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    setAuthState({ isAuthenticated: false, accessToken: null, error: null });
-    setItems([]);
-    setFolderPath([]);
-    setCurrentFolderId(null);
-  };
+    if (status === 'authenticated' && session?.accessToken) {
+      fetchItems(session.accessToken);
+    }
+  }, [status, session, fetchItems]);
 
   const downloadFile = async (fileId: string, fileName: string) => {
-    if (!authState.accessToken) return;
+    if (!session?.accessToken) return;
 
     try {
       const response = await fetch(`/api/download-file?fileId=${fileId}`, {
         headers: {
-          'Authorization': `Bearer ${authState.accessToken}`
+          'Authorization': `Bearer ${session.accessToken}`
         }
       });
 
@@ -194,57 +102,51 @@ const OneDrive: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  if (status === 'loading' || isLoading) {
     return <div>Loading...</div>;
+  }
+
+  if (status === 'unauthenticated') {
+    return <div>Please log in to access OneDrive files.</div>;
+  }
+
+  if (error) {
+    return <div>Error: {error}</div>;
   }
 
   return (
     <div>
-      <h1>OneDrive Integration</h1>
-      {authState.error && (
+      <h2>OneDrive Items</h2>
+      {folderPath.length > 0 && (
         <div>
-          <p>Error: {authState.error}</p>
-          <button onClick={initiateAuth}>Try Again</button>
+          <button onClick={handleBackClick}>Back</button>
+          <p>Current path: {folderPath.map(folder => folder.name).join(' > ')}</p>
         </div>
       )}
-      {!authState.isAuthenticated ? (
-        <button onClick={initiateAuth}>Login with OneDrive</button>
+      {items.length === 0 ? (
+        <p>No items found in this folder.</p>
       ) : (
-        <div>
-          <h2>OneDrive Items</h2>
-          <button onClick={handleLogout}>Logout</button>
-          {folderPath.length > 0 && (
-            <div>
-              <button onClick={handleBackClick}>Back</button>
-              <p>Current path: {folderPath.map(folder => folder.name).join(' > ')}</p>
-            </div>
-          )}
-          {items.length === 0 ? (
-            <p>No items found in this folder.</p>
-          ) : (
-            <ul>
-              {items.map((item) => (
-                <li key={item.id}>
-                  {item.folder ? (
-                    <button onClick={() => handleFolderClick(item.id, item.name)}>
-                      📁 {item.name} ({item.folder.childCount} items)
-                    </button>
-                  ) : (
-                    <a 
-                      href="#" 
-                      onClick={(e) => {
-                        e.preventDefault();
-                        downloadFile(item.id, item.name);
-                      }}
-                    >
-                      📄 {item.name}
-                    </a>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <ul>
+          {items.map((item) => (
+            <li key={item.id}>
+              {item.folder ? (
+                <button onClick={() => handleFolderClick(item.id, item.name)}>
+                  📁 {item.name} ({item.folder.childCount} items)
+                </button>
+              ) : (
+                <a 
+                  href="#" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    downloadFile(item.id, item.name);
+                  }}
+                >
+                  📄 {item.name}
+                </a>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

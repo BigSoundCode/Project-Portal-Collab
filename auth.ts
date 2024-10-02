@@ -1,44 +1,50 @@
-import NextAuth from 'next-auth';
-import Credentials from 'next-auth/providers/credentials';
-import { authConfig } from './auth.config';
-import { z } from 'zod';
-import { sql } from '@vercel/postgres';
-import type { User } from '@/app/lib/definitions';
-import bcrypt from 'bcrypt';
- 
-async function getUser(email: string): Promise<User | undefined> {
-  try {
-    const user = await sql<User>`SELECT * FROM users WHERE email=${email}`;
-    return user.rows[0];
-  } catch (error) {
-    console.error('Failed to fetch user:', error);
-    throw new Error('Failed to fetch user.');
+import NextAuth, { NextAuthOptions, DefaultSession } from 'next-auth';
+import { JWT } from 'next-auth/jwt';
+import AzureADProvider from "next-auth/providers/azure-ad";
+
+declare module "next-auth" {
+  interface Session extends DefaultSession {
+    accessToken?: string;
   }
 }
- 
-export const { auth, signIn, signOut } = NextAuth({
-  ...authConfig,
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    accessToken?: string;
+  }
+}
+
+export const authOptions: NextAuthOptions = {
   providers: [
-    Credentials({
-      async authorize(credentials) {
-        const parsedCredentials = z
-          .object({ email: z.string().email(), password: z.string().min(6) })
-          .safeParse(credentials);
- 
-        if (parsedCredentials.success) {
-          const { email, password } = parsedCredentials.data;
-          const user = await getUser(email);
-          if (!user) return null;
-          const passwordsMatch = await bcrypt.compare(password, user.password);
-
-          if (passwordsMatch) return user;
+    AzureADProvider({
+      clientId: process.env.CLIENT_ID!,
+      clientSecret: process.env.CLIENT_SECRET!,
+      tenantId: process.env.TENANT_ID,
+      authorization: {
+        params: {
+          scope: "openid profile email offline_access User.Read Files.Read"
         }
-
-        console.log('Invalid credentials');
-        return null;
- 
-        return null;
-      },
+      }
     }),
   ],
-});
+  callbacks: {
+    async jwt({ token, account }) {
+      if (account && account.access_token) {
+        token.accessToken = account.access_token;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      session.accessToken = token.accessToken;
+      return session;
+    },
+  },
+  pages: {
+    signIn: '/login',
+  },
+  debug: process.env.NODE_ENV === 'development',
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+};
+
+const handler = NextAuth(authOptions);
+export { handler as GET, handler as POST };
