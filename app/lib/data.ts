@@ -1,6 +1,7 @@
 import { sql } from '@vercel/postgres';
 
 import { User } from '@/app/lib/definitions';
+import { QueryResultRow } from '@vercel/postgres';
 
 export async function fetchAllUsers(): Promise<User[]> {
   try {
@@ -15,6 +16,7 @@ export async function fetchAllUsers(): Promise<User[]> {
     throw new Error('Failed to fetch all users.');
   }
 }
+
 
 
 
@@ -75,11 +77,20 @@ export async function checkUserExists(email: string) {
 
 export async function verifyDatabaseConnection() {
   try {
+    console.log('Attempting database connection...');
     const result = await sql`SELECT 1 as connected`;
+    console.log('Database connection result:', result);
     console.log('Database connection successful:', result.rows[0].connected === 1);
     return true;
   } catch (error) {
     console.error('Database connection failed:', error);
+    if (error instanceof Error) {
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
     return false;
   }
 }
+
+

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { fetchAllUsers, addUser, removeUser, updateUserOneDriveFolderId, verifyDatabaseConnection } from '@/app/lib/data';
 
 interface User {
@@ -11,6 +12,8 @@ interface User {
 }
 
 export default function AdminPage() {
+  console.log('AdminPage component is rendering');
+  const { data: session, status } = useSession();
   const [users, setUsers] = useState<User[]>([]);
   const [newUser, setNewUser] = useState({ name: '', email: '' });
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -21,28 +24,48 @@ export default function AdminPage() {
 
   useEffect(() => {
     async function checkDbAndLoadUsers() {
+      console.log('Starting checkDbAndLoadUsers function');
+      if (status === 'loading') return;
+      
+      // Check if user is admin
+      console.log('Session:', session);
+      if (!session || !session.isAdmin) {
+        console.log('Access denied: User is not an admin');
+        setError('Access Denied. You must be an admin to view this page.');
+        setLoading(false);
+        return;
+      }
+
       try {
+        console.log('Verifying database connection...');
         const isConnected = await verifyDatabaseConnection();
+        console.log('Database connection result:', isConnected);
         setDbConnected(isConnected);
         if (isConnected) {
+          console.log('Database connected, loading users...');
           await loadUsers();
         } else {
+          console.error('Database connection failed');
           setError('Unable to connect to the database. Please check your configuration.');
         }
       } catch (err) {
+        console.error('Error in checkDbAndLoadUsers:', err);
         setError(`Error: ${err instanceof Error ? err.message : 'Unknown error occurred'}`);
       } finally {
         setLoading(false);
       }
     }
     checkDbAndLoadUsers();
-  }, []);
+  }, [session, status]);
 
   const loadUsers = async () => {
     try {
+      console.log('Fetching users...');
       const fetchedUsers = await fetchAllUsers();
+      console.log('Users fetched:', fetchedUsers);
       setUsers(fetchedUsers);
     } catch (err) {
+      console.error('Error in loadUsers:', err);
       setError(`Failed to load users: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
@@ -50,19 +73,23 @@ export default function AdminPage() {
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      console.log('Adding new user:', newUser);
       await addUser(newUser.name, newUser.email);
       setNewUser({ name: '', email: '' });
       await loadUsers();
     } catch (err) {
+      console.error('Error in handleAddUser:', err);
       setError(`Failed to add user: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
   const handleRemoveUser = async (userId: string) => {
     try {
+      console.log('Removing user:', userId);
       await removeUser(userId);
       await loadUsers();
     } catch (err) {
+      console.error('Error in handleRemoveUser:', err);
       setError(`Failed to remove user: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
@@ -71,26 +98,57 @@ export default function AdminPage() {
     e.preventDefault();
     if (selectedUser) {
       try {
+        console.log('Updating folder ID for user:', selectedUser.id, 'New folder ID:', folderId);
         await updateUserOneDriveFolderId(selectedUser.id, folderId);
         setSelectedUser(null);
         setFolderId('');
         await loadUsers();
       } catch (err) {
+        console.error('Error in handleUpdateFolderId:', err);
         setError(`Failed to update folder ID: ${err instanceof Error ? err.message : 'Unknown error'}`);
       }
     }
   };
 
-  if (loading) {
+  if (status === 'loading' || loading) {
     return <div className="p-4">Loading...</div>;
   }
 
+  if (!session || !session.isAdmin) {
+    return <div className="p-4">Access Denied. You must be an admin to view this page.</div>;
+  }
+
   if (error) {
-    return <div className="p-4 text-red-500">{error}</div>;
+    return (
+      <div className="p-4">
+        <h1 className="text-2xl font-bold mb-4">Error</h1>
+        <p className="text-red-500">{error}</p>
+        <p className="mt-4">
+          Database connected: {dbConnected ? 'Yes' : 'No'}
+        </p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="mt-4 p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+        >
+          Retry
+        </button>
+      </div>
+    );
   }
 
   if (!dbConnected) {
-    return <div className="p-4">Error: Database connection failed. Please check your configuration.</div>;
+    return (
+      <div className="p-4">
+        <h1 className="text-2xl font-bold mb-4">Database Connection Error</h1>
+        <p>Error: Database connection failed. Please check your configuration.</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="mt-4 p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+        >
+          Retry Connection
+        </button>
+      </div>
+    );
   }
 
   return (

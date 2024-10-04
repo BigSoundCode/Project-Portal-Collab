@@ -1,18 +1,6 @@
-import NextAuth, { NextAuthOptions, DefaultSession } from 'next-auth';
-import { JWT } from 'next-auth/jwt';
+import NextAuth, { NextAuthOptions } from 'next-auth';
 import AzureADProvider from "next-auth/providers/azure-ad";
-
-declare module "next-auth" {
-  interface Session extends DefaultSession {
-    accessToken?: string;
-  }
-}
-
-declare module "next-auth/jwt" {
-  interface JWT {
-    accessToken?: string;
-  }
-}
+import { sql } from '@vercel/postgres';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -20,30 +8,32 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.CLIENT_ID!,
       clientSecret: process.env.CLIENT_SECRET!,
       tenantId: process.env.TENANT_ID,
-      authorization: {
-        params: {
-          scope: "openid profile email offline_access User.Read Files.Read"
-        }
-      }
     }),
   ],
   callbacks: {
-    async jwt({ token, account }) {
-      if (account && account.access_token) {
+    async jwt({ token, user, account }) {
+      if (account) {
         token.accessToken = account.access_token;
+      }
+      if (user?.email) {
+        const result = await sql`
+          SELECT is_admin FROM users WHERE email = ${user.email}
+        `;
+        if (result.rows.length > 0) {
+          token.isAdmin = result.rows[0].is_admin;
+        }
       }
       return token;
     },
     async session({ session, token }) {
       session.accessToken = token.accessToken;
+      session.isAdmin = token.isAdmin;
       return session;
     },
   },
   pages: {
     signIn: '/login',
   },
-  debug: process.env.NODE_ENV === 'development',
-  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
 };
 
 const handler = NextAuth(authOptions);
