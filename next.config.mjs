@@ -4,7 +4,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   
-    // Any other configurations you might have...
+  experimental: {
+    serverComponentsExternalPackages: ['@vercel/postgres'],
+  },
+  env: {
+    POSTGRES_URL: process.env.POSTGRES_URL,
+  },
   };
   
   export default nextConfig;

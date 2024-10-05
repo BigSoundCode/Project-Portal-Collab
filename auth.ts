@@ -10,6 +10,7 @@ export const authOptions: NextAuthOptions = {
       tenantId: process.env.TENANT_ID,
     }),
   ],
+  secret: process.env.NEXTAUTH_SECRET,
   callbacks: {
     async jwt({ token, user, account }) {
       if (account) {
@@ -38,3 +39,18 @@ export const authOptions: NextAuthOptions = {
 
 const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
+
+// Add these type declarations at the end of the file
+declare module "next-auth" {
+  interface Session {
+    accessToken?: string;
+    isAdmin?: boolean;
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    accessToken?: string;
+    isAdmin?: boolean;
+  }
+}

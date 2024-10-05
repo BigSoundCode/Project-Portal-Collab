@@ -3,6 +3,17 @@ import { sql } from '@vercel/postgres';
 import { User } from '@/app/lib/definitions';
 import { QueryResultRow } from '@vercel/postgres';
 
+import dotenv from 'dotenv';
+dotenv.config();
+
+console.log('POSTGRES_URL:', process.env.POSTGRES_URL);
+console.log('Current working directory:', process.cwd());
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('All environment variables:', process.env);
+
+
+
+
 export async function fetchAllUsers(): Promise<User[]> {
   try {
     const users = await sql<User>`
@@ -77,11 +88,11 @@ export async function checkUserExists(email: string) {
 
 export async function verifyDatabaseConnection() {
   try {
-    console.log('Attempting database connection...');
+    console.log('Attempting to verify database connection...');
+    console.log('POSTGRES_URL:', process.env.POSTGRES_URL);
     const result = await sql`SELECT 1 as connected`;
     console.log('Database connection result:', result);
-    console.log('Database connection successful:', result.rows[0].connected === 1);
-    return true;
+    return result.rows[0].connected === 1;
   } catch (error) {
     console.error('Database connection failed:', error);
     if (error instanceof Error) {
@@ -92,5 +103,7 @@ export async function verifyDatabaseConnection() {
     return false;
   }
 }
+
+
 
 

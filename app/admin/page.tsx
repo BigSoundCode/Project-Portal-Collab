@@ -14,6 +14,9 @@ interface User {
 export default function AdminPage() {
   console.log('AdminPage component is rendering');
   const { data: session, status } = useSession();
+  console.log('Session:', session);
+  console.log('Auth status:', status);
+
   const [users, setUsers] = useState<User[]>([]);
   const [newUser, setNewUser] = useState({ name: '', email: '' });
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -27,9 +30,14 @@ export default function AdminPage() {
       console.log('Starting checkDbAndLoadUsers function');
       if (status === 'loading') return;
       
-      // Check if user is admin
-      console.log('Session:', session);
-      if (!session || !session.isAdmin) {
+      if (!session) {
+        console.log('No session available');
+        setError('No session available. Please log in.');
+        setLoading(false);
+        return;
+      }
+
+      if (!session.isAdmin) {
         console.log('Access denied: User is not an admin');
         setError('Access Denied. You must be an admin to view this page.');
         setLoading(false);
@@ -114,7 +122,11 @@ export default function AdminPage() {
     return <div className="p-4">Loading...</div>;
   }
 
-  if (!session || !session.isAdmin) {
+  if (!session) {
+    return <div className="p-4">Please log in to access this page.</div>;
+  }
+
+  if (!session.isAdmin) {
     return <div className="p-4">Access Denied. You must be an admin to view this page.</div>;
   }
 
@@ -131,21 +143,6 @@ export default function AdminPage() {
           className="mt-4 p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
         >
           Retry
-        </button>
-      </div>
-    );
-  }
-
-  if (!dbConnected) {
-    return (
-      <div className="p-4">
-        <h1 className="text-2xl font-bold mb-4">Database Connection Error</h1>
-        <p>Error: Database connection failed. Please check your configuration.</p>
-        <button 
-          onClick={() => window.location.reload()} 
-          className="mt-4 p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-        >
-          Retry Connection
         </button>
       </div>
     );
