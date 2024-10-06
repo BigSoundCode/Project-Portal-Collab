@@ -150,7 +150,7 @@ export default function AdminPage() {
 
   return (
     <main className="p-6">
-      <h1 className="mb-6 text-2xl font-bold">Admin Dashboard</h1>
+      <h1 className="mb-6 text-2xl text-yellow-100 font-bold">Admin Dashboard</h1>
       
       <div className="grid gap-6 md:grid-cols-2">
         <div className="rounded-xl bg-white p-6 shadow-sm">
@@ -178,7 +178,7 @@ export default function AdminPage() {
                 required
               />
             </div>
-            <button type="submit" className="w-full p-2 bg-green-500 text-white rounded-md hover:bg-green-600">Add User</button>
+            <button type="submit" className="w-full p-2 bg-blue-100 text-white rounded-md hover:bg-green-600">Add User</button>
           </form>
         </div>
 
@@ -210,7 +210,7 @@ export default function AdminPage() {
                 className="w-full p-2 border rounded-md"
               />
             </div>
-            <button type="submit" className="w-full p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">Update Folder ID</button>
+            <button type="submit" className="w-full p-2 bg-blue-100 text-white rounded-md hover:bg-blue-600">Update Folder ID</button>
           </form>
         </div>
 

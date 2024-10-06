@@ -6,10 +6,6 @@ import { QueryResultRow } from '@vercel/postgres';
 import dotenv from 'dotenv';
 dotenv.config();
 
-console.log('POSTGRES_URL:', process.env.POSTGRES_URL);
-console.log('Current working directory:', process.cwd());
-console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('All environment variables:', process.env);
 
 
 
@@ -89,7 +85,7 @@ export async function checkUserExists(email: string) {
 export async function verifyDatabaseConnection() {
   try {
     console.log('Attempting to verify database connection...');
-    console.log('POSTGRES_URL:', process.env.POSTGRES_URL);
+   
     const result = await sql`SELECT 1 as connected`;
     console.log('Database connection result:', result);
     return result.rows[0].connected === 1;

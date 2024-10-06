@@ -10,15 +10,24 @@ interface DriveItem {
   file?: { mimeType: string };
 }
 
-const OneDrive: React.FC = () => {
+interface OneDriveProps {
+  initialFolderId?: string;
+}
+
+const OneDrive: React.FC<OneDriveProps> = ({ initialFolderId }) => {
+  console.log('OneDrive component initialized with initialFolderId:', initialFolderId);
+
   const { data: session, status } = useSession();
   const [items, setItems] = useState<DriveItem[]>([]);
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(initialFolderId || null);
   const [folderPath, setFolderPath] = useState<{ id: string; name: string }[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  console.log('Initial currentFolderId state:', currentFolderId);
+
   const fetchItems = useCallback(async (accessToken: string, folderId: string | null = null) => {
+    console.log('fetchItems called with folderId:', folderId);
     setIsLoading(true);
     try {
       const endpoint = folderId
@@ -54,27 +63,33 @@ const OneDrive: React.FC = () => {
   }, []);
 
   const handleFolderClick = useCallback((folderId: string, folderName: string) => {
+    console.log('Folder clicked:', folderId, folderName);
     setFolderPath(prev => [...prev, { id: folderId, name: folderName }]);
     fetchItems(session?.accessToken as string, folderId);
   }, [session, fetchItems]);
 
   const handleBackClick = useCallback(() => {
+    console.log('Back button clicked');
     if (folderPath.length > 0) {
       const newPath = [...folderPath];
       newPath.pop();
       setFolderPath(newPath);
       const parentFolderId = newPath.length > 0 ? newPath[newPath.length - 1].id : null;
+      console.log('Navigating to parent folder:', parentFolderId);
       fetchItems(session?.accessToken as string, parentFolderId);
     }
   }, [session, fetchItems, folderPath]);
 
   useEffect(() => {
+    console.log('useEffect triggered. Status:', status, 'CurrentFolderId:', currentFolderId);
     if (status === 'authenticated' && session?.accessToken) {
-      fetchItems(session.accessToken);
+      console.log('Calling fetchItems with currentFolderId:', currentFolderId);
+      fetchItems(session.accessToken, currentFolderId);
     }
-  }, [status, session, fetchItems]);
+  }, [status, session, fetchItems, currentFolderId]);
 
   const downloadFile = async (fileId: string, fileName: string) => {
+    console.log('Attempting to download file:', fileName, 'with ID:', fileId);
     if (!session?.accessToken) return;
 
     try {
@@ -97,6 +112,7 @@ const OneDrive: React.FC = () => {
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
+      console.log('File download initiated for:', fileName);
     } catch (error) {
       console.error('Error downloading file:', error);
     }

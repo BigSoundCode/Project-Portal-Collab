@@ -25,16 +25,19 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex items-center justify-center md:h-screen">
-      <div className="relative mx-auto flex w-full max-w-[400px] flex-col space-y-2.5 p-4 md:-mt-32">
-        <div className="flex h-20 w-full items-end justify-center">
+    <main className="flex items-center justify-center min-h-screen">
+      <div className="w-4/5 max-w-3xl flex flex-col items-center space-y-6 p-4">
+        <div className="flex items-center justify-center">
           <Image
-            src="/TBH_Logo_White_Vertical.png"
+            src="/Picture1.png"
             alt="Logo"
-            width={240}
-            height={44.856}
+            width={549.5}
+            height={224}
           />
         </div>
+        <h1 className="text-2xl md:text-3xl font-bold text-yellow-100 text-center">
+          Welcome to our customer portal!
+        </h1>
         <LoginForm />
       </div>
     </main>
