@@ -1,8 +1,9 @@
-'use client';
+'use client'
 
 import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
-export default function AuthError() {
+function ErrorContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
   const message = searchParams.get('message');
@@ -14,5 +15,13 @@ export default function AuthError() {
       <p>Message: {message || 'No error message provided'}</p>
       <p>If you believe this is a mistake, please contact the administrator.</p>
     </div>
+  );
+}
+
+export default function AuthError() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ErrorContent />
+    </Suspense>
   );
 }
