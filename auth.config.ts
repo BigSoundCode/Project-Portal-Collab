@@ -1,25 +1,47 @@
-import type { NextAuthConfig } from 'next-auth';
+import type { NextAuthOptions, DefaultSession } from 'next-auth';
+import type { JWT } from 'next-auth/jwt';
 
-export const authConfig = {
+// Extend the Session type
+interface ExtendedSession extends DefaultSession {
+  user: {
+    is_admin?: boolean;
+  } & DefaultSession["user"]
+}
+
+export const authConfig: NextAuthOptions = {
   pages: {
     signIn: '/login',
   },
   callbacks: {
-    authorized({ auth, request: { nextUrl } }) {
-      const isLoggedIn = !!auth?.user;
-      const isOnDashboard = nextUrl.pathname.startsWith('/dashboard');
-      const isOnAdmin = nextUrl.pathname.startsWith('/admin');
-      
-      if (isOnDashboard) {
-        if (isLoggedIn) return true;
-        return false; // Redirect unauthenticated users to login page
-      } else if (isOnAdmin) {
-        // @ts-ignore: Property 'is_admin' does not exist on type 'User'
-        if (isLoggedIn && auth.user.is_admin) return true;
-        return false; // Redirect non-admin users
+    async session({ session, token }): Promise<ExtendedSession> {
+      return {
+        ...session,
+        user: {
+          ...session.user,
+          is_admin: token.is_admin as boolean | undefined,
+        },
+      };
+    },
+    async jwt({ token, user }) {
+      if (user) {
+        token.is_admin = (user as { is_admin?: boolean }).is_admin;
       }
-      return true;
+      return token;
     },
   },
   providers: [], // Add providers with an empty array for now
-} satisfies NextAuthConfig;
+};
+
+// Add these type declarations at the end of the file
+declare module "next-auth" {
+  interface Session extends ExtendedSession {}
+  interface User {
+    is_admin?: boolean;
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    is_admin?: boolean;
+  }
+}
