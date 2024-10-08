@@ -21,7 +21,7 @@ export const authOptions: NextAuthOptions = {
           SELECT is_admin FROM users WHERE email = ${user.email}
         `;
         if (result.rows.length > 0) {
-          token.isAdmin = result.rows[0].is_admin;
+          token.isAdmin = result.rows[0].is_admin; // Note: is_admin here because it's the database column name
         }
       }
       return token;

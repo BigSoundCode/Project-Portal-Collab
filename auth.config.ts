@@ -4,7 +4,7 @@ import type { JWT } from 'next-auth/jwt';
 // Extend the Session type
 interface ExtendedSession extends DefaultSession {
   user: {
-    is_admin?: boolean;
+    isAdmin?: boolean;
   } & DefaultSession["user"]
 }
 
@@ -18,13 +18,13 @@ export const authConfig: NextAuthOptions = {
         ...session,
         user: {
           ...session.user,
-          is_admin: token.is_admin as boolean | undefined,
+          isAdmin: token.isAdmin as boolean | undefined,
         },
       };
     },
     async jwt({ token, user }) {
       if (user) {
-        token.is_admin = (user as { is_admin?: boolean }).is_admin;
+        token.isAdmin = (user as { isAdmin?: boolean }).isAdmin;
       }
       return token;
     },
@@ -36,12 +36,12 @@ export const authConfig: NextAuthOptions = {
 declare module "next-auth" {
   interface Session extends ExtendedSession {}
   interface User {
-    is_admin?: boolean;
+    isAdmin?: boolean;
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
-    is_admin?: boolean;
+    isAdmin?: boolean;
   }
 }
