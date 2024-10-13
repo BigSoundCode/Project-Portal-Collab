@@ -7,7 +7,7 @@ export const authOptions: NextAuthOptions = {
     AzureADProvider({
       clientId: process.env.CLIENT_ID!,
       clientSecret: process.env.CLIENT_SECRET!,
-      tenantId: process.env.TENANT_ID,
+      tenantId: 'common',
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET,

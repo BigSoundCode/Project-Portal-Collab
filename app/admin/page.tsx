@@ -12,52 +12,40 @@ interface User {
 }
 
 export default function AdminPage() {
-  console.log('AdminPage component is rendering');
   const { data: session, status } = useSession();
-  console.log('Session:', session);
-  console.log('Auth status:', status);
-
   const [users, setUsers] = useState<User[]>([]);
   const [newUser, setNewUser] = useState({ name: '', email: '' });
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [folderId, setFolderId] = useState('');
+  const [folderLink, setFolderLink] = useState('');
   const [dbConnected, setDbConnected] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function checkDbAndLoadUsers() {
-      console.log('Starting checkDbAndLoadUsers function');
       if (status === 'loading') return;
       
       if (!session) {
-        console.log('No session available');
         setError('No session available. Please log in.');
         setLoading(false);
         return;
       }
 
       if (!session.isAdmin) {
-        console.log('Access denied: User is not an admin');
         setError('Access Denied. You must be an admin to view this page.');
         setLoading(false);
         return;
       }
 
       try {
-        console.log('Verifying database connection...');
         const isConnected = await verifyDatabaseConnection();
-        console.log('Database connection result:', isConnected);
         setDbConnected(isConnected);
         if (isConnected) {
-          console.log('Database connected, loading users...');
           await loadUsers();
         } else {
-          console.error('Database connection failed');
           setError('Unable to connect to the database. Please check your configuration.');
         }
       } catch (err) {
-        console.error('Error in checkDbAndLoadUsers:', err);
         setError(`Error: ${err instanceof Error ? err.message : 'Unknown error occurred'}`);
       } finally {
         setLoading(false);
@@ -68,12 +56,9 @@ export default function AdminPage() {
 
   const loadUsers = async () => {
     try {
-      console.log('Fetching users...');
       const fetchedUsers = await fetchAllUsers();
-      console.log('Users fetched:', fetchedUsers);
       setUsers(fetchedUsers);
     } catch (err) {
-      console.error('Error in loadUsers:', err);
       setError(`Failed to load users: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
@@ -81,38 +66,43 @@ export default function AdminPage() {
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      console.log('Adding new user:', newUser);
       await addUser(newUser.name, newUser.email);
       setNewUser({ name: '', email: '' });
       await loadUsers();
     } catch (err) {
-      console.error('Error in handleAddUser:', err);
       setError(`Failed to add user: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
   const handleRemoveUser = async (userId: string) => {
     try {
-      console.log('Removing user:', userId);
       await removeUser(userId);
       await loadUsers();
     } catch (err) {
-      console.error('Error in handleRemoveUser:', err);
       setError(`Failed to remove user: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
+  };
+
+  const parseFolderId = (link: string): string | null => {
+    const regex = /\/personal\/[^\/]+\/([^?]+)/;
+    const match = link.match(regex);
+    return match ? match[1] : null;
   };
 
   const handleUpdateFolderId = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedUser) {
       try {
-        console.log('Updating folder ID for user:', selectedUser.id, 'New folder ID:', folderId);
-        await updateUserOneDriveFolderId(selectedUser.id, folderId);
+        const parsedFolderId = parseFolderId(folderLink);
+        if (!parsedFolderId) {
+          setError('Invalid OneDrive folder link. Please check the link and try again.');
+          return;
+        }
+        await updateUserOneDriveFolderId(selectedUser.id, parsedFolderId);
         setSelectedUser(null);
-        setFolderId('');
+        setFolderLink('');
         await loadUsers();
       } catch (err) {
-        console.error('Error in handleUpdateFolderId:', err);
         setError(`Failed to update folder ID: ${err instanceof Error ? err.message : 'Unknown error'}`);
       }
     }
@@ -183,7 +173,7 @@ export default function AdminPage() {
         </div>
 
         <div className="rounded-xl bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-xl font-semibold">Update OneDrive Folder ID</h2>
+          <h2 className="mb-4 text-xl font-semibold">Update OneDrive Folder Link</h2>
           <form onSubmit={handleUpdateFolderId} className="space-y-4">
             <div>
               <label htmlFor="user-select" className="block mb-2 text-sm font-medium text-gray-700">Select User</label>
@@ -200,17 +190,17 @@ export default function AdminPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="folder-id" className="block mb-2 text-sm font-medium text-gray-700">OneDrive Folder ID</label>
+              <label htmlFor="folder-link" className="block mb-2 text-sm font-medium text-gray-700">OneDrive Folder Link</label>
               <input
-                id="folder-id"
+                id="folder-link"
                 type="text"
-                placeholder="OneDrive Folder ID"
-                value={folderId}
-                onChange={(e) => setFolderId(e.target.value)}
+                placeholder="Paste OneDrive folder link here"
+                value={folderLink}
+                onChange={(e) => setFolderLink(e.target.value)}
                 className="w-full p-2 border rounded-md"
               />
             </div>
-            <button type="submit" className="w-full p-2 bg-blue-100 text-white rounded-md hover:bg-blue-600">Update Folder ID</button>
+            <button type="submit" className="w-full p-2 bg-blue-100 text-white rounded-md hover:bg-blue-600">Update Folder Link</button>
           </form>
         </div>
 

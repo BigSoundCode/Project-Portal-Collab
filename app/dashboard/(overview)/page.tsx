@@ -7,7 +7,14 @@ interface DriveItem {
   id: string;
   name: string;
   folder?: { childCount: number };
-  file?: { mimeType: string };
+  file?: { 
+    mimeType?: string;
+    thumbnails?: Array<{
+      large?: {
+        url: string;
+      };
+    }>;
+  };
 }
 
 const UserName: React.FC = () => {
@@ -33,7 +40,7 @@ const FolderList: React.FC<{
           {folder.name}
         </button>
         {index < folders.length - 1 && (
-          <hr className="my-2 mx-4 border-t border-gray-300" />
+          <hr className="my-2 mx-4 border-t border-black" />
         )}
       </React.Fragment>
     ))}
@@ -41,6 +48,68 @@ const FolderList: React.FC<{
 ));
 
 FolderList.displayName = 'FolderList';
+
+const ItemList: React.FC<{
+  items: DriveItem[];
+  onFolderClick: (id: string, name: string) => void;
+  onFileClick: (id: string, name: string) => void;
+}> = React.memo(({ items, onFolderClick, onFileClick }) => {
+  const isImage = (item: DriveItem) => {
+    return item.file?.mimeType?.startsWith('image/') || 
+           ['.jpg', '.jpeg', '.png', '.gif', '.bmp'].some(ext => item.name.toLowerCase().endsWith(ext));
+  };
+
+  const getThumbUrl = (item: DriveItem) => {
+    return item.file?.thumbnails?.[0]?.large?.url;
+  };
+
+  const sortedItems = [...items].sort((a, b) => {
+    if (isImage(a) && !isImage(b)) return -1;
+    if (!isImage(a) && isImage(b)) return 1;
+    return 0;
+  });
+
+  return (
+    <ul className="space-y-2">
+      {sortedItems.map((item, index) => (
+        <React.Fragment key={item.id}>
+          <li className="flex items-center">
+            {item.folder ? (
+              <button 
+                onClick={() => onFolderClick(item.id, item.name)}
+                className="flex items-center space-x-2 px-4 py-2 hover:bg-yellow-100 rounded transition-colors duration-200 w-full text-left"
+              >
+                <span role="img" aria-label="Folder">📁</span>
+                <span>{item.name}</span>
+              </button>
+            ) : isImage(item) && getThumbUrl(item) ? (
+              <button 
+                onClick={() => onFileClick(item.id, item.name)}
+                className="flex items-center space-x-2 px-4 py-2 hover:bg-yellow-100 rounded transition-colors duration-200 w-full text-left"
+              >
+                <img src={getThumbUrl(item)} alt={item.name} className="w-10 h-10 object-cover" />
+                <span>{item.name}</span>
+              </button>
+            ) : (
+              <button 
+                onClick={() => onFileClick(item.id, item.name)}
+                className="flex items-center space-x-2 px-4 py-2 hover:bg-yellow-100 rounded transition-colors duration-200 w-full text-left"
+              >
+                <span role="img" aria-label="File">📄</span>
+                <span>{item.name}</span>
+              </button>
+            )}
+          </li>
+          {index < sortedItems.length - 1 && (
+            <hr className="my-2 border-t border-black" />
+          )}
+        </React.Fragment>
+      ))}
+    </ul>
+  );
+});
+
+ItemList.displayName = 'ItemList';
 
 export default function Page() {
   const { data: session, status } = useSession();
@@ -77,6 +146,7 @@ export default function Page() {
     } finally {
       setIsLoading(false);
     }
+    console.log('Fetching items with token:', accessToken.substring(0, 10) + '...');
   }, []);
 
   useEffect(() => {
@@ -153,9 +223,9 @@ export default function Page() {
 
   return (
     <>
-      <aside className="w-64 bg-white border-r border-gray-200 overflow-y-auto">
+      <aside className="w-64 bg-white border-r border-black overflow-y-auto">
         <UserName />
-        <hr className="border-t border-gray-300 my-4" />
+        <hr className="border-t border-black my-4" />
         <FolderList folders={rootFolders} onFolderClick={handleFolderClick} />
       </aside>
       <main className="flex-grow p-6 overflow-y-auto">
@@ -164,37 +234,26 @@ export default function Page() {
           {folderPath.length > 0 && (
             <button 
               onClick={handleBackClick}
-              className="px-4 py-2 bg-yellow-100 text-white rounded hover:bg-blue-600 transition-colors duration-200"
+              className="px-4 py-2 bg-yellow-100 text-black rounded hover:bg-blue-600 hover:text-white transition-colors duration-200"
             >
               Back
             </button>
           )}
         </div>
         
-        <ul className="space-y-2">
-          {currentItems.map((item) => (
-            <li key={item.id} className="flex items-center">
-              {item.folder ? (
-                <button 
-                  onClick={() => handleFolderClick(item.id, item.name)}
-                  className="flex items-center space-x-2 px-4 py-2 hover:bg-gray-100 rounded transition-colors duration-200 w-full text-left"
-                >
-                  <span role="img" aria-label="Folder">📁</span>
-                  <span>{item.name} ({item.folder.childCount} items)</span>
-                </button>
-              ) : (
-                <button 
-                  onClick={() => downloadFile(item.id, item.name)}
-                  className="flex items-center space-x-2 px-4 py-2 hover:bg-gray-100 rounded transition-colors duration-200 w-full text-left"
-                >
-                  <span role="img" aria-label="File">📄</span>
-                  <span>{item.name}</span>
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
+        <ItemList 
+          items={currentItems} 
+          onFolderClick={handleFolderClick} 
+          onFileClick={downloadFile}
+        />
       </main>
     </>
   );
+
+  useEffect(() => {
+    console.log('Session status:', status);
+    console.log('Session data:', session);
+  }, [status, session]);
+  
 }
+
