@@ -5,7 +5,8 @@ import type { JWT } from 'next-auth/jwt';
 interface ExtendedSession extends DefaultSession {
   user: {
     isAdmin?: boolean;
-  } & DefaultSession["user"]
+  } & DefaultSession["user"];
+  accessToken?: string;
 }
 
 export const authConfig: NextAuthOptions = {
@@ -16,13 +17,17 @@ export const authConfig: NextAuthOptions = {
     async session({ session, token }): Promise<ExtendedSession> {
       return {
         ...session,
+        accessToken: token.accessToken as string,
         user: {
           ...session.user,
           isAdmin: token.isAdmin as boolean | undefined,
         },
       };
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
+      if (account) {
+        token.accessToken = account.access_token;
+      }
       if (user) {
         token.isAdmin = (user as { isAdmin?: boolean }).isAdmin;
       }
@@ -43,5 +48,6 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     isAdmin?: boolean;
+    accessToken?: string;
   }
 }

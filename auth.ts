@@ -8,6 +8,11 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.CLIENT_ID!,
       clientSecret: process.env.CLIENT_SECRET!,
       tenantId: 'common',
+      authorization: {
+        params: {
+          scope: "openid profile email offline_access https://graph.microsoft.com/Files.Read"
+        }
+      }
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET,
@@ -21,7 +26,7 @@ export const authOptions: NextAuthOptions = {
           SELECT is_admin FROM users WHERE email = ${user.email}
         `;
         if (result.rows.length > 0) {
-          token.isAdmin = result.rows[0].is_admin; // Note: is_admin here because it's the database column name
+          token.isAdmin = result.rows[0].is_admin;
         }
       }
       return token;

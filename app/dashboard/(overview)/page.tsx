@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 interface DriveItem {
   id: string;
@@ -113,6 +114,7 @@ ItemList.displayName = 'ItemList';
 
 export default function Page() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [rootFolders, setRootFolders] = useState<DriveItem[]>([]);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [currentItems, setCurrentItems] = useState<DriveItem[]>([]);
@@ -121,23 +123,40 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchItems = useCallback(async (accessToken: string, folderId: string | null = null) => {
+    console.log('Fetching items with token:', accessToken.substring(0, 10) + '...');
     setIsLoading(true);
+    setError(null);
     try {
       const endpoint = folderId
         ? `https://graph.microsoft.com/v1.0/me/drive/items/${folderId}/children`
         : 'https://graph.microsoft.com/v1.0/me/drive/root/children';
 
+      console.log('Fetching from endpoint:', endpoint);
+
       const response = await fetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
         },
       });
 
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
-        throw new Error(`Failed to fetch items: ${response.status}`);
+        const errorBody = await response.text();
+        console.error('OneDrive API Error:', response.status, errorBody);
+        
+        if (response.status === 401) {
+          console.log('Authentication error. Redirecting to sign in...');
+          await signIn('azure-ad'); // Redirect to sign in
+          return [];
+        }
+        
+        throw new Error(`Failed to fetch items: ${response.status} - ${errorBody}`);
       }
 
       const data = await response.json();
+      console.log('Fetched items:', data.value.length);
       return data.value;
     } catch (error) {
       console.error('Error in fetchItems:', error);
@@ -146,19 +165,23 @@ export default function Page() {
     } finally {
       setIsLoading(false);
     }
-    console.log('Fetching items with token:', accessToken.substring(0, 10) + '...');
   }, []);
 
   useEffect(() => {
-    if (status === 'authenticated' && session?.accessToken) {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    } else if (status === 'authenticated' && session?.accessToken) {
+      console.log('Authenticated. Fetching root items...');
       fetchItems(session.accessToken).then(items => {
+        console.log('Root items fetched:', items.length);
         setRootFolders(items.filter((item: DriveItem) => item.folder));
         setCurrentItems(items);
       });
     }
-  }, [status, session, fetchItems]);
+  }, [status, session, fetchItems, router]);
 
   const handleFolderClick = useCallback((folderId: string, folderName: string) => {
+    console.log('Folder clicked:', folderName, folderId);
     if (session?.accessToken) {
       setFolderPath(prev => [...prev, { id: folderId, name: folderName }]);
       setCurrentFolderId(folderId);
@@ -167,6 +190,7 @@ export default function Page() {
   }, [session, fetchItems]);
 
   const handleBackClick = useCallback(() => {
+    console.log('Back button clicked');
     if (folderPath.length > 0 && session?.accessToken) {
       const newPath = [...folderPath];
       newPath.pop();
@@ -178,7 +202,11 @@ export default function Page() {
   }, [session, fetchItems, folderPath]);
 
   const downloadFile = async (fileId: string, fileName: string) => {
-    if (!session?.accessToken) return;
+    console.log('Downloading file:', fileName, fileId);
+    if (!session?.accessToken) {
+      console.error('No access token available for download');
+      return;
+    }
 
     try {
       const response = await fetch(`/api/download-file?fileId=${fileId}`, {
@@ -187,8 +215,12 @@ export default function Page() {
         }
       });
 
+      console.log('Download response status:', response.status);
+
       if (!response.ok) {
-        throw new Error(`Download failed: ${response.status}`);
+        const errorBody = await response.text();
+        console.error('Download API Error:', response.status, errorBody);
+        throw new Error(`Download failed: ${response.status} - ${errorBody}`);
       }
 
       const blob = await response.blob();
@@ -200,8 +232,10 @@ export default function Page() {
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
+      console.log('File download initiated');
     } catch (error) {
       console.error('Error downloading file:', error);
+      setError('Failed to download file. Please try again.');
     }
   };
 
@@ -214,7 +248,12 @@ export default function Page() {
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return (
+      <div>
+        <p>Error: {error}</p>
+        <button onClick={() => signIn('azure-ad')}>Try signing in again</button>
+      </div>
+    );
   }
 
   const currentFolderName = folderPath.length > 0 
@@ -249,11 +288,6 @@ export default function Page() {
       </main>
     </>
   );
-
-  useEffect(() => {
-    console.log('Session status:', status);
-    console.log('Session data:', session);
-  }, [status, session]);
-  
 }
+
 
