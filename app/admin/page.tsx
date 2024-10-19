@@ -16,7 +16,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [newUser, setNewUser] = useState({ name: '', email: '' });
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [folderLink, setFolderLink] = useState('');
+  const [folderId, setFolderId] = useState('');
   const [dbConnected, setDbConnected] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -83,29 +83,28 @@ export default function AdminPage() {
     }
   };
 
-  const parseFolderId = (link: string): string | null => {
-    const regex = /\/personal\/[^\/]+\/([^?]+)/;
-    const match = link.match(regex);
-    return match ? match[1] : null;
-  };
-
   const handleUpdateFolderId = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedUser) {
       try {
-        const parsedFolderId = parseFolderId(folderLink);
-        if (!parsedFolderId) {
-          setError('Invalid OneDrive folder link. Please check the link and try again.');
+        if (!isValidFolderId(folderId)) {
+          setError('Invalid OneDrive folder ID. Please check the ID and try again.');
           return;
         }
-        await updateUserOneDriveFolderId(selectedUser.id, parsedFolderId);
+        await updateUserOneDriveFolderId(selectedUser.id, folderId);
         setSelectedUser(null);
-        setFolderLink('');
+        setFolderId('');
         await loadUsers();
       } catch (err) {
         setError(`Failed to update folder ID: ${err instanceof Error ? err.message : 'Unknown error'}`);
       }
     }
+  };
+
+  const isValidFolderId = (id: string): boolean => {
+    // This regex pattern checks for a string of 32 characters that can be alphanumeric or underscore
+    const folderIdPattern = /^[A-Z0-9_]{32}$/;
+    return folderIdPattern.test(id);
   };
 
   if (status === 'loading' || loading) {
@@ -173,7 +172,7 @@ export default function AdminPage() {
         </div>
 
         <div className="rounded-xl bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-xl font-semibold">Update OneDrive Folder Link</h2>
+          <h2 className="mb-4 text-xl font-semibold">Update OneDrive Folder ID</h2>
           <form onSubmit={handleUpdateFolderId} className="space-y-4">
             <div>
               <label htmlFor="user-select" className="block mb-2 text-sm font-medium text-gray-700">Select User</label>
@@ -190,17 +189,17 @@ export default function AdminPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="folder-link" className="block mb-2 text-sm font-medium text-gray-700">OneDrive Folder Link</label>
+              <label htmlFor="folder-id" className="block mb-2 text-sm font-medium text-gray-700">OneDrive Folder ID</label>
               <input
-                id="folder-link"
+                id="folder-id"
                 type="text"
-                placeholder="Paste OneDrive folder link here"
-                value={folderLink}
-                onChange={(e) => setFolderLink(e.target.value)}
+                placeholder="Enter OneDrive folder ID"
+                value={folderId}
+                onChange={(e) => setFolderId(e.target.value)}
                 className="w-full p-2 border rounded-md"
               />
             </div>
-            <button type="submit" className="w-full p-2 bg-blue-100 text-white rounded-md hover:bg-blue-600">Update Folder Link</button>
+            <button type="submit" className="w-full p-2 bg-blue-100 text-white rounded-md hover:bg-blue-600">Update Folder ID</button>
           </form>
         </div>
 
