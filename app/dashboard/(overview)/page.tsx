@@ -1,229 +1,196 @@
-'use client'
+'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import FolderContent from '@/app/ui/dashboard/FolderContent';
+import Sidebar from '@/app/ui/dashboard/Sidebar';
+import { FolderProvider, useFolderContext } from '@/app/contexts/FolderContext';
+import { DriveItem } from '@/app/lib/definitions';
 
-interface DriveItem {
-  id: string;
-  name: string;
-  folder?: { childCount: number };
-  file?: { 
-    mimeType?: string;
-    thumbnails?: Array<{
-      large?: {
-        url: string;
-      };
-    }>;
-  };
-}
-
-const UserName: React.FC = () => {
-  const { data: session } = useSession();
-  return (
-    <div className="p-4">
-      <h2 className="text-lg font-semibold">{session?.user?.name || 'User'}</h2>
-    </div>
-  );
-};
-
-const FolderList: React.FC<{
-  folders: DriveItem[];
-  onFolderClick: (id: string, name: string) => void;
-}> = React.memo(({ folders, onFolderClick }) => (
-  <nav className="mt-4">
-    {folders.map((folder, index) => (
-      <React.Fragment key={folder.id}>
-        <button 
-          className="w-full text-left px-4 py-2 hover:bg-yellow-100 transition-colors duration-200"
-          onClick={() => onFolderClick(folder.id, folder.name)}
-        >
-          {folder.name}
-        </button>
-        {index < folders.length - 1 && (
-          <hr className="my-2 mx-4 border-t border-black" />
-        )}
-      </React.Fragment>
-    ))}
-  </nav>
-));
-
-FolderList.displayName = 'FolderList';
-
-const ItemList: React.FC<{
-  items: DriveItem[];
-  onFolderClick: (id: string, name: string) => void;
-  onFileClick: (id: string, name: string) => void;
-}> = React.memo(({ items, onFolderClick, onFileClick }) => {
-  const isImage = (item: DriveItem) => {
-    return item.file?.mimeType?.startsWith('image/') || 
-           ['.jpg', '.jpeg', '.png', '.gif', '.bmp'].some(ext => item.name.toLowerCase().endsWith(ext));
-  };
-
-  const getThumbUrl = (item: DriveItem) => {
-    return item.file?.thumbnails?.[0]?.large?.url;
-  };
-
-  const sortedItems = [...items].sort((a, b) => {
-    if (isImage(a) && !isImage(b)) return -1;
-    if (!isImage(a) && isImage(b)) return 1;
-    return 0;
-  });
-
-  return (
-    <ul className="space-y-2">
-      {sortedItems.map((item, index) => (
-        <React.Fragment key={item.id}>
-          <li className="flex items-center">
-            {item.folder ? (
-              <button 
-                onClick={() => onFolderClick(item.id, item.name)}
-                className="flex items-center space-x-2 px-4 py-2 hover:bg-yellow-100 rounded transition-colors duration-200 w-full text-left"
-              >
-                <span role="img" aria-label="Folder">📁</span>
-                <span>{item.name}</span>
-              </button>
-            ) : isImage(item) && getThumbUrl(item) ? (
-              <button 
-                onClick={() => onFileClick(item.id, item.name)}
-                className="flex items-center space-x-2 px-4 py-2 hover:bg-yellow-100 rounded transition-colors duration-200 w-full text-left"
-              >
-                <img src={getThumbUrl(item)} alt={item.name} className="w-10 h-10 object-cover" />
-                <span>{item.name}</span>
-              </button>
-            ) : (
-              <button 
-                onClick={() => onFileClick(item.id, item.name)}
-                className="flex items-center space-x-2 px-4 py-2 hover:bg-yellow-100 rounded transition-colors duration-200 w-full text-left"
-              >
-                <span role="img" aria-label="File">📄</span>
-                <span>{item.name}</span>
-              </button>
-            )}
-          </li>
-          {index < sortedItems.length - 1 && (
-            <hr className="my-2 border-t border-black" />
-          )}
-        </React.Fragment>
-      ))}
-    </ul>
-  );
-});
-
-ItemList.displayName = 'ItemList';
-
-export default function Page() {
+function DashboardContent() {
   const { data: session, status } = useSession();
-  const router = useRouter();
   const [rootFolders, setRootFolders] = useState<DriveItem[]>([]);
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
-  const [currentItems, setCurrentItems] = useState<DriveItem[]>([]);
-  const [folderPath, setFolderPath] = useState<{ id: string; name: string }[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [rootDriveId, setRootDriveId] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState<boolean>(true);
+  const [isFetching, setIsFetching] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const { 
+    setCurrentItems, 
+    setRootFolderName, 
+    setFolderPath,
+    folderPath 
+  } = useFolderContext();
 
-  const fetchItems = useCallback(async (accessToken: string, folderId: string | null = null) => {
-    console.log('Fetching items with token:', accessToken.substring(0, 10) + '...');
-    setIsLoading(true);
+  const fetchItems = useCallback(async (folderId: string, isInitialLoad: boolean = false) => {
+    console.log('==========================================');
+    console.log('FETCH ITEMS STARTED');
+    console.log('Folder ID:', folderId);
+    console.log('Is initial load:', isInitialLoad);
+    console.log('Current drive ID:', rootDriveId);
+    console.log('==========================================');
+  
+    if (!session?.accessToken) {
+      setError('Authentication error. Please try signing in again.');
+      return [];
+    }
+  
+    if (!isInitialLoad) {
+      setIsFetching(true);
+    }
     setError(null);
+  
     try {
-      const endpoint = folderId
-        ? `https://graph.microsoft.com/v1.0/me/drive/items/${folderId}/children`
-        : 'https://graph.microsoft.com/v1.0/me/drive/root/children';
-
-      console.log('Fetching from endpoint:', endpoint);
-
-      const response = await fetch(endpoint, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-      });
-
-      console.log('Response status:', response.status);
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        console.error('OneDrive API Error:', response.status, errorBody);
-        
-        if (response.status === 401) {
-          console.log('Authentication error. Redirecting to sign in...');
-          await signIn('azure-ad'); // Redirect to sign in
-          return [];
+      // Handle root folder access
+      if (folderId === session.onedriveFolderId) {
+        const folderResponse = await fetch(`https://graph.microsoft.com/v1.0/shares/${folderId}/driveItem`, {
+          headers: {
+            'Authorization': `Bearer ${session.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+  
+        if (!folderResponse.ok) {
+          throw new Error('Failed to access root folder');
         }
+  
+        const folderData = await folderResponse.json();
+        const driveId = folderData.parentReference?.driveId || folderData.remoteItem?.parentReference?.driveId;
+        const itemId = folderData.id || folderData.remoteItem?.id;
+  
+        if (!driveId || !itemId) {
+          throw new Error('Could not determine folder location');
+        }
+  
+        // Set root information only on initial load
+        if (isInitialLoad) {
+          setRootDriveId(driveId);
+          setRootFolderName(folderData.name);
+          setFolderPath([{
+            id: itemId,
+            name: folderData.name,
+            driveId: driveId
+          }]);
+        }
+  
+        // Get root folder contents
+        const contentsResponse = await fetch(
+          `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${itemId}/children`,
+          {
+            headers: {
+              'Authorization': `Bearer ${session.accessToken}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+  
+        if (!contentsResponse.ok) {
+          throw new Error('Failed to get folder contents');
+        }
+  
+        const contentsData = await contentsResponse.json();
         
-        throw new Error(`Failed to fetch items: ${response.status} - ${errorBody}`);
+        // Update root folders only on initial load
+        if (isInitialLoad) {
+          const folders = contentsData.value.filter((item: DriveItem) => item.folder);
+          setRootFolders(folders);
+        }
+  
+        setCurrentItems(contentsData.value);
+        return contentsData.value;
+      } 
+      // Handle subfolder access
+      else {
+        if (!rootDriveId) {
+          throw new Error('Drive ID not found');
+        }
+  
+        // Directly get the contents of the clicked folder
+        const contentsResponse = await fetch(
+          `https://graph.microsoft.com/v1.0/drives/${rootDriveId}/items/${folderId}/children`,
+          {
+            headers: {
+              'Authorization': `Bearer ${session.accessToken}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+  
+        if (!contentsResponse.ok) {
+          throw new Error('Failed to access folder contents');
+        }
+  
+        const contentsData = await contentsResponse.json();
+        setCurrentItems(contentsData.value);
+        return contentsData.value;
       }
-
-      const data = await response.json();
-      console.log('Fetched items:', data.value.length);
-      return data.value;
     } catch (error) {
       console.error('Error in fetchItems:', error);
       setError(error instanceof Error ? error.message : 'An unknown error occurred');
       return [];
     } finally {
-      setIsLoading(false);
+      if (!isInitialLoad) {
+        setIsFetching(false);
+      }
     }
-  }, []);
-
+  }, [session, rootDriveId, setCurrentItems, setRootDriveId, setRootFolderName, setFolderPath]);
+  
+  // Update the useEffect to use isInitialLoad
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login');
-    } else if (status === 'authenticated' && session?.accessToken) {
-      console.log('Authenticated. Fetching root items...');
-      fetchItems(session.accessToken).then(items => {
-        console.log('Root items fetched:', items.length);
-        setRootFolders(items.filter((item: DriveItem) => item.folder));
-        setCurrentItems(items);
-      });
+    async function initializeFolderView() {
+      if (status === 'authenticated' && session?.accessToken && session?.onedriveFolderId) {
+        try {
+          const items = await fetchItems(session.onedriveFolderId, true);
+          if (items.length > 0) {
+            const folders = items.filter((item: DriveItem) => item.folder);
+            setRootFolders(folders);
+          }
+        } catch (error) {
+          console.error('Error initializing folder view:', error);
+          setError('Failed to access folder. Please check your permissions.');
+        } finally {
+          setIsInitializing(false);
+        }
+      } else if (status !== 'loading') {
+        setIsInitializing(false);
+      }
     }
-  }, [status, session, fetchItems, router]);
+  
+    initializeFolderView();
+  }, [status, session?.accessToken, session?.onedriveFolderId]); // Remove fetchItems from dependencies
 
-  const handleFolderClick = useCallback((folderId: string, folderName: string) => {
-    console.log('Folder clicked:', folderName, folderId);
-    if (session?.accessToken) {
-      setFolderPath(prev => [...prev, { id: folderId, name: folderName }]);
-      setCurrentFolderId(folderId);
-      fetchItems(session.accessToken, folderId).then(setCurrentItems);
-    }
-  }, [session, fetchItems]);
-
-  const handleBackClick = useCallback(() => {
-    console.log('Back button clicked');
-    if (folderPath.length > 0 && session?.accessToken) {
-      const newPath = [...folderPath];
-      newPath.pop();
-      setFolderPath(newPath);
-      const parentFolderId = newPath.length > 0 ? newPath[newPath.length - 1].id : null;
-      setCurrentFolderId(parentFolderId);
-      fetchItems(session.accessToken, parentFolderId).then(setCurrentItems);
-    }
-  }, [session, fetchItems, folderPath]);
-
-  const downloadFile = async (fileId: string, fileName: string) => {
-    console.log('Downloading file:', fileName, fileId);
-    if (!session?.accessToken) {
-      console.error('No access token available for download');
+  const downloadFile = useCallback(async (fileId: string, fileName: string) => {
+    if (!session?.accessToken || !rootDriveId) {
+      setError('No access token or drive ID available for download');
       return;
     }
-
+  
     try {
-      const response = await fetch(`/api/download-file?fileId=${fileId}`, {
+      const fileInfoEndpoint = `https://graph.microsoft.com/v1.0/drives/${rootDriveId}/items/${fileId}`;
+      const fileInfoResponse = await fetch(fileInfoEndpoint, {
         headers: {
-          'Authorization': `Bearer ${session.accessToken}`
+          'Authorization': `Bearer ${session.accessToken}`,
+          'Content-Type': 'application/json'
         }
       });
-
-      console.log('Download response status:', response.status);
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        console.error('Download API Error:', response.status, errorBody);
-        throw new Error(`Download failed: ${response.status} - ${errorBody}`);
+  
+      if (!fileInfoResponse.ok) {
+        throw new Error(`Failed to get file information: ${fileInfoResponse.status}`);
       }
-
-      const blob = await response.blob();
+  
+      const fileInfo = await fileInfoResponse.json();
+      
+      if (!fileInfo['@microsoft.graph.downloadUrl']) {
+        throw new Error('Download URL not available');
+      }
+  
+      const downloadResponse = await fetch(fileInfo['@microsoft.graph.downloadUrl']);
+  
+      if (!downloadResponse.ok) {
+        throw new Error(`Download failed: ${downloadResponse.status}`);
+      }
+  
+      const blob = await downloadResponse.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.style.display = 'none';
@@ -232,19 +199,43 @@ export default function Page() {
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
-      console.log('File download initiated');
+      document.body.removeChild(a);
     } catch (error) {
       console.error('Error downloading file:', error);
       setError('Failed to download file. Please try again.');
     }
-  };
+  }, [session?.accessToken, rootDriveId]);
 
-  if (status === 'loading' || isLoading) {
+  useEffect(() => {
+    async function initializeFolderView() {
+      if (status === 'authenticated' && session?.accessToken && session?.onedriveFolderId) {
+        try {
+          const items = await fetchItems(session.onedriveFolderId);
+          if (items.length > 0) {
+            const folders = items.filter((item: DriveItem) => item.folder);
+            setRootFolders(folders);
+          }
+        } catch (error) {
+          console.error('Error initializing folder view:', error);
+          setError('Failed to access folder. Please check your permissions.');
+        } finally {
+          setIsInitializing(false);
+        }
+      } else if (status !== 'loading') {
+        setIsInitializing(false);
+      }
+    }
+
+    initializeFolderView();
+  }, [status, session, fetchItems]);
+
+  // Only show loading for initial load
+  if (status === 'loading' || isInitializing) {
     return <div>Loading...</div>;
   }
 
   if (status === 'unauthenticated') {
-    return <div>Please log in to access OneDrive files.</div>;
+    return <div>Please log in to access your files.</div>;
   }
 
   if (error) {
@@ -256,38 +247,27 @@ export default function Page() {
     );
   }
 
-  const currentFolderName = folderPath.length > 0 
-    ? folderPath[folderPath.length - 1].name 
-    : 'Home';
-
   return (
-    <>
-      <aside className="w-64 bg-white border-r border-black overflow-y-auto">
-        <UserName />
-        <hr className="border-t border-black my-4" />
-        <FolderList folders={rootFolders} onFolderClick={handleFolderClick} />
-      </aside>
-      <main className="flex-grow p-6 overflow-y-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">{currentFolderName}</h1>
-          {folderPath.length > 0 && (
-            <button 
-              onClick={handleBackClick}
-              className="px-4 py-2 bg-yellow-100 text-black rounded hover:bg-blue-600 hover:text-white transition-colors duration-200"
-            >
-              Back
-            </button>
-          )}
-        </div>
-        
-        <ItemList 
-          items={currentItems} 
-          onFolderClick={handleFolderClick} 
-          onFileClick={downloadFile}
-        />
-      </main>
-    </>
+    <div className="flex h-screen w-full bg-gray-100">
+      <Sidebar 
+        rootFolders={rootFolders} 
+        fetchItems={fetchItems}
+        isLoading={isFetching}
+      />
+      <FolderContent 
+        fetchItems={fetchItems}
+        onFileClick={downloadFile}
+        rootDriveId={rootDriveId}
+        isLoading={isFetching}
+      />
+    </div>
   );
 }
 
-
+export default function Page() {
+  return (
+    <FolderProvider>
+      <DashboardContent />
+    </FolderProvider>
+  );
+}

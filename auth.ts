@@ -2,6 +2,22 @@ import NextAuth, { NextAuthOptions } from 'next-auth';
 import AzureADProvider from "next-auth/providers/azure-ad";
 import { sql } from '@vercel/postgres';
 
+declare module "next-auth" {
+  interface Session {
+    accessToken?: string;
+    isAdmin?: boolean;
+    onedriveFolderId?: string;
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    accessToken?: string;
+    isAdmin?: boolean;
+    onedriveFolderId?: string;
+  }
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     AzureADProvider({
@@ -10,7 +26,7 @@ export const authOptions: NextAuthOptions = {
       tenantId: 'common',
       authorization: {
         params: {
-          scope: "openid profile email offline_access https://graph.microsoft.com/Files.Read"
+          scope: "openid profile email offline_access https://graph.microsoft.com/Files.Read.All"
         }
       }
     }),
@@ -23,10 +39,11 @@ export const authOptions: NextAuthOptions = {
       }
       if (user?.email) {
         const result = await sql`
-          SELECT is_admin FROM users WHERE email = ${user.email}
+          SELECT is_admin, onedrive_folder_id FROM users WHERE email = ${user.email}
         `;
         if (result.rows.length > 0) {
           token.isAdmin = result.rows[0].is_admin;
+          token.onedriveFolderId = result.rows[0].onedrive_folder_id;
         }
       }
       return token;
@@ -34,6 +51,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       session.accessToken = token.accessToken;
       session.isAdmin = token.isAdmin;
+      session.onedriveFolderId = token.onedriveFolderId;
       return session;
     },
   },
@@ -44,18 +62,3 @@ export const authOptions: NextAuthOptions = {
 
 const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
-
-// Add these type declarations at the end of the file
-declare module "next-auth" {
-  interface Session {
-    accessToken?: string;
-    isAdmin?: boolean;
-  }
-}
-
-declare module "next-auth/jwt" {
-  interface JWT {
-    accessToken?: string;
-    isAdmin?: boolean;
-  }
-}

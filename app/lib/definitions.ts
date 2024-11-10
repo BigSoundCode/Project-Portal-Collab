@@ -18,7 +18,35 @@ declare module 'next-auth' {
   interface Session extends DefaultSession {
     accessToken?: string;
     isAdmin?: boolean;
+    driveId?: string;
+
   }
+}
+
+export interface DriveItem {
+  id: string;
+  name: string;
+  folder?: { childCount: number };
+  file?: { 
+    mimeType?: string;
+    thumbnails?: Array<{
+      large?: {
+        url: string;
+      };
+    }>;
+  };
+  remoteItem?: {
+    id: string;
+    parentReference: {
+      driveId: string;
+    };
+  };
+}
+
+export interface FolderReference {
+  id: string;
+  name: string;
+  driveId: string;
 }
 
 

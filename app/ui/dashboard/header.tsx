@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import NavLinks from '@/app/ui/dashboard/nav-links';
 import Image from 'next/image';
 
 export default function Header() {

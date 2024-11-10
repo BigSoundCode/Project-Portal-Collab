@@ -9,6 +9,34 @@ interface User {
   name: string;
   email: string;
   onedrive_folder_id: string | null;
+  folder_id_type?: 'direct' | 'share';
+}
+
+// Helper functions for handling folder IDs and share URLs
+function isShareUrl(value: string): boolean {
+  return value.includes('sharepoint.com/:f:/g/') || value.includes('1drv.ms/');
+}
+
+function getShareIdFromUrl(shareUrl: string): string {
+  // Remove any trailing slashes and spaces
+  const cleanUrl = shareUrl.trim().replace(/\/$/, '');
+  
+  // Convert the URL to base64
+  const encodedUrl = Buffer.from(cleanUrl).toString('base64');
+  
+  // Create the format that Microsoft Graph API expects
+  return `u!${encodedUrl.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
+}
+
+function isValidFolderId(value: string): boolean {
+  // Check if it's a share URL
+  if (isShareUrl(value)) {
+    return true;
+  }
+  
+  // Check if it's a traditional folder ID
+  const folderIdPattern = /^[A-Za-z0-9_]{32}$/;
+  return folderIdPattern.test(value);
 }
 
 export default function AdminPage() {
@@ -88,10 +116,14 @@ export default function AdminPage() {
     if (selectedUser) {
       try {
         if (!isValidFolderId(folderId)) {
-          setError('Invalid OneDrive folder ID. Please check the ID and try again.');
+          setError('Invalid OneDrive folder ID or share URL. Please check and try again.');
           return;
         }
-        await updateUserOneDriveFolderId(selectedUser.id, folderId);
+
+        // Convert share URL to proper format if necessary
+        const finalFolderId = isShareUrl(folderId) ? getShareIdFromUrl(folderId) : folderId;
+        
+        await updateUserOneDriveFolderId(selectedUser.id, finalFolderId);
         setSelectedUser(null);
         setFolderId('');
         await loadUsers();
@@ -99,12 +131,6 @@ export default function AdminPage() {
         setError(`Failed to update folder ID: ${err instanceof Error ? err.message : 'Unknown error'}`);
       }
     }
-  };
-
-  const isValidFolderId = (id: string): boolean => {
-    // This regex pattern checks for a string of 32 characters that can be alphanumeric or underscore
-    const folderIdPattern = /^[A-Z0-9_]{32}$/;
-    return folderIdPattern.test(id);
   };
 
   if (status === 'loading' || loading) {
@@ -172,7 +198,7 @@ export default function AdminPage() {
         </div>
 
         <div className="rounded-xl bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-xl font-semibold">Update OneDrive Folder ID</h2>
+          <h2 className="mb-4 text-xl font-semibold">Update OneDrive Access</h2>
           <form onSubmit={handleUpdateFolderId} className="space-y-4">
             <div>
               <label htmlFor="user-select" className="block mb-2 text-sm font-medium text-gray-700">Select User</label>
@@ -189,30 +215,47 @@ export default function AdminPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="folder-id" className="block mb-2 text-sm font-medium text-gray-700">OneDrive Folder ID</label>
+              <label htmlFor="folder-id" className="block mb-2 text-sm font-medium text-gray-700">
+                OneDrive Folder ID or Share URL
+              </label>
               <input
                 id="folder-id"
                 type="text"
-                placeholder="Enter OneDrive folder ID"
+                placeholder="Enter folder ID or SharePoint sharing URL"
                 value={folderId}
                 onChange={(e) => setFolderId(e.target.value)}
                 className="w-full p-2 border rounded-md"
               />
+              <p className="mt-1 text-sm text-gray-500">
+                You can enter either a folder ID or a SharePoint sharing URL
+              </p>
             </div>
-            <button type="submit" className="w-full p-2 bg-blue-100 text-white rounded-md hover:bg-blue-600">Update Folder ID</button>
+            <button type="submit" className="w-full p-2 bg-blue-100 text-white rounded-md hover:bg-blue-600">
+              Update Folder Access
+            </button>
           </form>
         </div>
 
         <div className="rounded-xl bg-white p-6 shadow-sm col-span-2">
           <h2 className="mb-4 text-xl font-semibold">User List</h2>
-          <button onClick={loadUsers} className="mb-4 p-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">Refresh Users</button>
+          <button onClick={loadUsers} className="mb-4 p-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
+            Refresh Users
+          </button>
           <ul className="space-y-2">
             {users.map(user => (
               <li key={user.id} className="p-2 bg-gray-100 rounded-md flex justify-between items-center">
                 <div>
                   <strong>{user.name}</strong> ({user.email})
                   <br />
-                  Folder ID: {user.onedrive_folder_id || 'Not set'}
+                  {user.onedrive_folder_id ? (
+                    <span className="text-sm">
+                      Folder Access: {isShareUrl(user.onedrive_folder_id) ? 'Shared Link' : 'Direct ID'}
+                      <br />
+                      ID: {user.onedrive_folder_id}
+                    </span>
+                  ) : (
+                    'Folder Access: Not set'
+                  )}
                 </div>
                 <div>
                   <button

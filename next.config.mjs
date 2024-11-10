@@ -5,7 +5,7 @@
 const nextConfig = {
   
   experimental: {
-    serverComponentsExternalPackages: ['@vercel/postgres'],
+    serverComponentsExternalPackages: ['@vercel/postgres', 'jsonwebtoken'],
   },
   env: {
     POSTGRES_URL: process.env.POSTGRES_URL,
