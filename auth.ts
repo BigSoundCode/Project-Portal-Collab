@@ -1,63 +1,120 @@
 import NextAuth, { NextAuthOptions } from 'next-auth';
-import AzureADProvider from "next-auth/providers/azure-ad";
-import { sql } from '@vercel/postgres';
+import CredentialsProvider from "next-auth/providers/credentials";
+import { authenticateUser } from "app/lib/auth-actions";
+import { JWT } from 'next-auth/jwt';
 
-declare module "next-auth" {
-  interface Session {
-    accessToken?: string;
-    isAdmin?: boolean;
-    onedriveFolderId?: string;
-  }
+// Extended user type to include our custom fields
+interface ExtendedUser {
+  id: string;
+  name: string;
+  email: string;
+  isAdmin?: boolean;
+  onedrive_folder_id?: string;
 }
 
-declare module "next-auth/jwt" {
-  interface JWT {
-    accessToken?: string;
-    isAdmin?: boolean;
-    onedriveFolderId?: string;
+async function getAzureAccessToken() {
+  const tokenEndpoint = `https://login.microsoftonline.com/${process.env.TENANT_ID}/oauth2/v2.0/token`;
+  
+  const body = new URLSearchParams({
+    client_id: process.env.CLIENT_ID!,
+    client_secret: process.env.CLIENT_SECRET!,
+    scope: 'https://graph.microsoft.com/.default',
+    grant_type: 'client_credentials'
+  });
+
+  const response = await fetch(tokenEndpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: body
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to get Azure access token');
   }
+
+  const data = await response.json();
+  return data.access_token;
 }
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    AzureADProvider({
-      clientId: process.env.CLIENT_ID!,
-      clientSecret: process.env.CLIENT_SECRET!,
-      tenantId: 'common',
-      authorization: {
-        params: {
-          scope: "openid profile email offline_access https://graph.microsoft.com/Files.Read.All"
+    CredentialsProvider({
+      name: 'Credentials',
+      credentials: {
+        email: { 
+          label: "Email", 
+          type: "email",
+          placeholder: "email@example.com"
+        },
+        password: { 
+          label: "Password", 
+          type: "password" 
+        }
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials.password) {
+          return null;
+        }
+
+        try {
+          const user = await authenticateUser(
+            credentials.email,
+            credentials.password
+          );
+
+          if (!user) {
+            return null;
+          }
+
+          // Cast the user to our extended type
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            isAdmin: user.is_admin || false,
+            onedrive_folder_id: user.onedrive_folder_id
+          } as ExtendedUser;
+        } catch (error) {
+          console.error('Auth error:', error);
+          return null;
         }
       }
     }),
   ],
-  secret: process.env.NEXTAUTH_SECRET,
   callbacks: {
-    async jwt({ token, user, account }) {
-      if (account) {
-        token.accessToken = account.access_token;
-      }
-      if (user?.email) {
-        const result = await sql`
-          SELECT is_admin, onedrive_folder_id FROM users WHERE email = ${user.email}
-        `;
-        if (result.rows.length > 0) {
-          token.isAdmin = result.rows[0].is_admin;
-          token.onedriveFolderId = result.rows[0].onedrive_folder_id;
+    async jwt({ token, user }) {
+      if (user) {
+        token.userId = user.id;
+        token.isAdmin = (user as ExtendedUser).isAdmin || false;
+        token.onedriveFolderId = (user as ExtendedUser).onedrive_folder_id;
+        
+        // Get Azure access token when creating the JWT
+        try {
+          const azureToken = await getAzureAccessToken();
+          token.accessToken = azureToken;
+        } catch (error) {
+          console.error('Failed to get Azure token:', error);
         }
       }
       return token;
     },
     async session({ session, token }) {
-      session.accessToken = token.accessToken;
-      session.isAdmin = token.isAdmin;
-      session.onedriveFolderId = token.onedriveFolderId;
+      if (session.user) {
+        session.user.id = token.userId;
+        session.user.isAdmin = token.isAdmin || false;
+        session.accessToken = token.accessToken;
+        session.onedriveFolderId = token.onedriveFolderId;
+        session.error = token.error;
+      }
       return session;
-    },
+    }
   },
   pages: {
     signIn: '/login',
   },
+  debug: true
 };
 
 const handler = NextAuth(authOptions);

@@ -6,13 +6,12 @@ import { useFolderContext } from '@/app/contexts/FolderContext';
 
 interface FolderContentProps {
   fetchItems: (folderId: string, isInitialLoad?: boolean) => Promise<DriveItem[]>;
-  onFileClick: (id: string, name: string) => void;
+  onFileClick: (id: string, name: string, item: DriveItem) => void;
   rootDriveId: string | null;
-  isLoading?: boolean; // Add this
+  isLoading?: boolean;
 }
 
-
-const FolderContent = React.memo(({ fetchItems, onFileClick, rootDriveId }: FolderContentProps) => {
+const FolderContent = React.memo(({ fetchItems, onFileClick, rootDriveId, isLoading }: FolderContentProps) => {
   const { 
     currentItems, 
     folderPath, 
@@ -22,27 +21,26 @@ const FolderContent = React.memo(({ fetchItems, onFileClick, rootDriveId }: Fold
     setFolderPath
   } = useFolderContext();
 
-  // In both files, update getIconPath:
-const getIconPath = (folderName: string): string => {
-  switch (folderName) {
-    case 'Customer Inspiration':
-      return '/icons/customer-inspiration.svg';
-    case 'Progress Photos':
-      return '/icons/progress-photos.svg';
-    case 'Contracts':
-      return '/icons/contracts.svg';
-    case 'Drawings':
-      return '/icons/drawings.svg';
-    case 'Permit Info':
-      return '/icons/permit-info.svg';
-    case 'Schedule':
-      return '/icons/schedule.svg';
-    case 'Budget':
-      return '/icons/budget.svg';
-    default:
-      return '/icons/folder.svg'; // Default icon path
-  }
-};
+  const getIconPath = (folderName: string): string => {
+    switch (folderName) {
+      case 'Customer Inspiration':
+        return '/icons/customer-inspiration.svg';
+      case 'Progress Photos':
+        return '/icons/progress-photos.svg';
+      case 'Contracts':
+        return '/icons/contracts.svg';
+      case 'Drawings':
+        return '/icons/drawings.svg';
+      case 'Permit Info':
+        return '/icons/permit-info.svg';
+      case 'Schedule':
+        return '/icons/schedule.svg';
+      case 'Budget':
+        return '/icons/budget.svg';
+      default:
+        return '/icons/folder.svg';
+    }
+  };
 
   const isImage = (item: DriveItem) => {
     return item.file?.mimeType?.startsWith('image/') || 
@@ -51,7 +49,7 @@ const getIconPath = (folderName: string): string => {
   };
 
   const getThumbUrl = (item: DriveItem) => {
-    return item.file?.thumbnails?.[0]?.large?.url;
+    return item.thumbnails?.[0]?.large?.url;
   };
 
   const handleFolderClick = React.useCallback(async (folderId: string, folderName: string) => {
@@ -90,6 +88,23 @@ const getIconPath = (folderName: string): string => {
 
   const isRootFolder = folderPath.length <= 1;
   const currentFolderName = folderPath[folderPath.length - 1]?.name || rootFolderName;
+
+  if (isLoading) {
+    return (
+      <main className="flex-1 flex flex-col min-w-0 w-full bg-white">
+        <div className="p-6">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+            <div className="space-y-4">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <div key={n} className="h-12 bg-gray-100 rounded"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex-1 flex flex-col min-w-0 w-full bg-white">
@@ -147,15 +162,19 @@ const getIconPath = (folderName: string): string => {
                   </button>
                 ) : isImage(item) && getThumbUrl(item) ? (
                   <button 
-                    onClick={() => onFileClick(item.id, item.name)}
+                    onClick={() => onFileClick(item.id, item.name, item)}
                     className="flex items-center space-x-2 px-4 py-2 hover:bg-yellow-100 rounded transition-colors duration-200 w-full text-left"
                   >
-                    <img src={getThumbUrl(item)} alt={item.name} className="w-10 h-10 object-cover" />
+                    <img 
+                      src={getThumbUrl(item)} 
+                      alt={item.name} 
+                      className="w-10 h-10 object-cover rounded"
+                    />
                     <span>{item.name}</span>
                   </button>
                 ) : (
                   <button 
-                    onClick={() => onFileClick(item.id, item.name)}
+                    onClick={() => onFileClick(item.id, item.name, item)}
                     className="flex items-center space-x-2 px-4 py-2 hover:bg-yellow-100 rounded transition-colors duration-200 w-full text-left"
                   >
                     <span role="img" aria-label="File">📄</span>

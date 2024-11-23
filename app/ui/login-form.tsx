@@ -5,6 +5,7 @@ import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import {
   AtSymbolIcon,
+  KeyIcon,
   ExclamationCircleIcon,
 } from '@heroicons/react/24/outline';
 import { ArrowRightIcon } from '@heroicons/react/20/solid';
@@ -12,6 +13,7 @@ import { Button } from '@/app/ui/button';
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
   const router = useRouter();
@@ -23,27 +25,15 @@ export default function LoginForm() {
     setIsPending(true);
 
     try {
-      // First, check if the user exists in your database
-      const checkResponse = await fetch('/api/check-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      if (!checkResponse.ok) {
-        setErrorMessage('User not found. Please contact your administrator.');
-        setIsPending(false);
-        return;
-      }
-
-      // If user exists, proceed with Microsoft authentication
-      const result = await signIn('azure-ad', {
+      const result = await signIn('credentials', {
+        email,
+        password,
         redirect: false,
         callbackUrl: '/dashboard'
       });
 
       if (result?.error) {
-        setErrorMessage(result.error);
+        setErrorMessage('Invalid email or password');
       } else if (result?.url) {
         router.push(result.url);
       }
@@ -94,6 +84,27 @@ export default function LoginForm() {
                 onChange={(e) => setEmail(e.target.value)}
               />
               <AtSymbolIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500 peer-focus:text-gray-900" />
+            </div>
+          </div>
+          <div>
+            <label
+              className="mb-3 mt-5 block text-xs font-medium text-white"
+              htmlFor="password"
+            >
+              Password
+            </label>
+            <div className="relative">
+              <input
+                className="peer block w-full rounded-md border border-gray-200 py-[9px] pl-10 text-sm outline-2 placeholder:text-gray-500"
+                id="password"
+                type="password"
+                name="password"
+                placeholder="Enter your password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <KeyIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500 peer-focus:text-gray-900" />
             </div>
           </div>
         </div>

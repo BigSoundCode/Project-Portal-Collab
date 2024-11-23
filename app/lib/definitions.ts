@@ -1,7 +1,3 @@
-// This file contains type definitions for your data.
-// It describes the shape of the data, and what data type each property should accept.
-// For simplicity of teaching, we're manually defining these types.
-// However, these types are generated automatically if you're using an ORM such as Prisma.
 import { QueryResultRow } from '@vercel/postgres';
 import { DefaultSession } from 'next-auth';
 
@@ -10,35 +6,60 @@ export interface User extends QueryResultRow {
   name: string;
   email: string;
   onedrive_folder_id: string | null;
-  is_admin: boolean;
+  is_admin: boolean | undefined;
 }
 
-// Extend the built-in Session type
 declare module 'next-auth' {
   interface Session extends DefaultSession {
+    user: {
+      id: string;
+      name: string;
+      email: string;
+      isAdmin?: boolean;
+    } & DefaultSession['user'];
     accessToken?: string;
-    isAdmin?: boolean;
-    driveId?: string;
+    onedriveFolderId?: string;
+    error?: string;
+  }
 
+  interface User {
+    id: string;
+    name: string;
+    email: string;
+    isAdmin?: boolean;
+  }
+}
+
+declare module 'next-auth/jwt' {
+  interface JWT {
+    userId: string;
+    isAdmin?: boolean;
+    accessToken?: string;
+    onedriveFolderId?: string;
+    error?: string;
   }
 }
 
 export interface DriveItem {
   id: string;
   name: string;
+  size?: number;
   folder?: { childCount: number };
   file?: { 
     mimeType?: string;
-    thumbnails?: Array<{
-      large?: {
-        url: string;
-      };
-    }>;
+    thumbnails?: any[];
+  };
+  webUrl: string;
+  createdDateTime: string;
+  lastModifiedDateTime: string;
+  children?: DriveItem[];
+  thumbnails?: any[];
+  parentReference?: {
+    driveId?: string;
   };
   remoteItem?: {
-    id: string;
-    parentReference: {
-      driveId: string;
+    parentReference?: {
+      driveId?: string;
     };
   };
 }

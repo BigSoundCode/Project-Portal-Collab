@@ -1,9 +1,5 @@
-
-
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  
   experimental: {
     serverComponentsExternalPackages: ['@vercel/postgres', 'jsonwebtoken'],
   },
@@ -13,6 +9,6 @@ const nextConfig = {
     CLIENT_SECRET: process.env.CLIENT_SECRET,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
   },
-  };
-  
-  export default nextConfig;
+};
+
+export default nextConfig;
