@@ -7,31 +7,7 @@ import LoginForm from '@/app/ui/login-form';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 
-// Debug Panel Component
-const DebugPanel = () => {
-  const { data: session, status } = useSession();
-  const searchParams = useSearchParams();
 
-  return (
-    <div className="fixed bottom-4 right-4 max-w-md bg-black bg-opacity-75 p-4 text-white rounded z-50">
-      <h3 className="font-bold mb-2">Debug Info</h3>
-      <pre className="text-xs">
-        {JSON.stringify({
-          status,
-          session: {
-            user: session?.user,
-            hasAccessToken: !!session?.accessToken,
-            onedriveFolderId: session?.onedriveFolderId
-          },
-          params: {
-            callbackUrl: searchParams.get('callbackUrl'),
-            error: searchParams.get('error')
-          }
-        }, null, 2)}
-      </pre>
-    </div>
-  );
-};
 
 export default function LoginPage() {
   const { data: session, status } = useSession();
@@ -48,7 +24,7 @@ export default function LoginPage() {
     return (
       <>
         <div>Loading...</div>
-        {process.env.NODE_ENV !== 'production' && <DebugPanel />}
+        {process.env.NODE_ENV !== 'production'}
       </>
     );
   }
@@ -73,7 +49,7 @@ export default function LoginPage() {
         </h1>
         <LoginForm />
       </div>
-      {process.env.NODE_ENV !== 'production' && <DebugPanel />}
+      {process.env.NODE_ENV !== 'production'}
     </main>
   );
 }
