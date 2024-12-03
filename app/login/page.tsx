@@ -5,14 +5,12 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import LoginForm from '@/app/ui/login-form';
 import Image from 'next/image';
-import { useSearchParams } from 'next/navigation';
 
 
 
 export default function LoginPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
     if (session) {
