@@ -22,18 +22,32 @@ const config: Config = {
           100: '#c09f4a',
         }
       },
-    },
-    keyframes: {
-      shimmer: {
-        '100%': {
-          transform: 'translateX(100%)',
+      animation: {
+        'spin-slow': 'spin 3s linear infinite',
+        'spin-slow-reverse': 'spin 2.5s linear infinite reverse',
+        'fade-in': 'fadeIn 0.5s ease-in',
+        'slide-in': 'slideIn 0.5s ease-out forwards',
+      },
+      keyframes: {
+        shimmer: {
+          '100%': {
+            transform: 'translateX(100%)',
+          },
+        },
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideIn: {
+          '0%': { transform: 'translateX(-100%)', opacity: '0' },
+          '100%': { transform: 'translateX(0)', opacity: '1' },
         },
       },
     },
   },
   plugins: [require('@tailwindcss/forms')],
 };
-export default config;
 
+export default config;
 // tailwind.config.js
 

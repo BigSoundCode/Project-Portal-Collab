@@ -1,16 +1,7 @@
-import NextAuth, { NextAuthOptions } from 'next-auth';
+import NextAuth, { NextAuthOptions, Session, User } from 'next-auth';
 import CredentialsProvider from "next-auth/providers/credentials";
-import { authenticateUser } from "app/lib/auth-actions";
-import { JWT } from 'next-auth/jwt';
-
-// Extended user type to include our custom fields
-interface ExtendedUser {
-  id: string;
-  name: string;
-  email: string;
-  isAdmin?: boolean;
-  onedrive_folder_id?: string;
-}
+import { authenticateUser } from "@/app/lib/auth-actions";
+import { ExtendedJWT, ExtendedUser } from '@/app/lib/definitions';
 
 async function getAzureAccessToken() {
   const tokenEndpoint = `https://login.microsoftonline.com/${process.env.TENANT_ID}/oauth2/v2.0/token`;
@@ -68,14 +59,14 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
-          // Cast the user to our extended type
+          // Convert to standard User type that NextAuth expects
           return {
             id: user.id,
             name: user.name,
             email: user.email,
             isAdmin: user.is_admin || false,
-            onedrive_folder_id: user.onedrive_folder_id
-          } as ExtendedUser;
+            onedrive_folder_id: user.onedrive_folder_id || null
+          } as User;
         } catch (error) {
           console.error('Auth error:', error);
           return null;
@@ -84,13 +75,13 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }): Promise<ExtendedJWT> {
       if (user) {
         token.userId = user.id;
-        token.isAdmin = (user as ExtendedUser).isAdmin || false;
-        token.onedriveFolderId = (user as ExtendedUser).onedrive_folder_id;
+        token.isAdmin = user.isAdmin || false;
+        token.onedrive_folder_id = user.onedrive_folder_id;
+        token.lastFolderScan = Date.now();
         
-        // Get Azure access token when creating the JWT
         try {
           const azureToken = await getAzureAccessToken();
           token.accessToken = azureToken;
@@ -98,14 +89,15 @@ export const authOptions: NextAuthOptions = {
           console.error('Failed to get Azure token:', error);
         }
       }
-      return token;
+      return token as ExtendedJWT;
     },
-    async session({ session, token }) {
+    async session({ session, token }): Promise<Session> {
       if (session.user) {
         session.user.id = token.userId;
         session.user.isAdmin = token.isAdmin || false;
         session.accessToken = token.accessToken;
-        session.onedriveFolderId = token.onedriveFolderId;
+        session.onedrive_folder_id = token.onedrive_folder_id;
+        session.lastFolderScan = token.lastFolderScan;
         session.error = token.error;
       }
       return session;

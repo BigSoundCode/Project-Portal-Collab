@@ -222,8 +222,6 @@ const fetchItems = useCallback(async (folderId: string, isInitialLoad: boolean =
     }
 
     const data = await response.json();
-    
-
     let folderName = data.name;
     
     if (isInitialLoad) {
@@ -240,14 +238,25 @@ const fetchItems = useCallback(async (folderId: string, isInitialLoad: boolean =
           name: folderName,
           driveId: driveId
         }]);
+
+        // Only perform recursive scan if it hasn't been done recently
+        if (!session.lastFolderScan || Date.now() - session.lastFolderScan > 24 * 60 * 60 * 1000) {
+          const folders = data.children?.filter((item: DriveItem) => item.folder) || [];
+          setRootFolders(folders);
+          
+          // Check contents of each folder
+          console.log('Performing initial folder scan...');
+          for (const folder of folders) {
+            console.log(`Scanning folder: ${folder.name}`);
+            const folderContents = await fetchFolderContents(folder.id, folder.name);
+            console.log(`Found ${folderContents.length} items in ${folder.name}`);
+          }
+        } else {
+          console.log('Skipping folder scan - already performed recently');
+          const folders = data.children?.filter((item: DriveItem) => item.folder) || [];
+          setRootFolders(folders);
+        }
       }
-    } else {
-      const newFolder = {
-        id: folderIdToUse,
-        name: folderName,
-        driveId: rootDriveId || ''
-      };
-      setFolderPath(prevPath => [...prevPath, newFolder]);
     }
 
     const processedItems = data.children?.map((item: DriveItem) => ({
@@ -261,19 +270,6 @@ const fetchItems = useCallback(async (folderId: string, isInitialLoad: boolean =
       lastModifiedDateTime: item.lastModifiedDateTime,
       thumbnails: item.thumbnails
     })) || [];
-
-    if (isInitialLoad) {
-      const folders = processedItems.filter((item: DriveItem) => item.folder);
-      setRootFolders(folders);
-      
-      // Check contents of each folder
-      console.log('Checking root folders for contents...');
-      for (const folder of folders) {
-        console.log(`Checking contents of folder: ${folder.name}`);
-        const folderContents = await fetchFolderContents(folder.id, folder.name);
-        console.log(`Found ${folderContents.length} items in ${folder.name}`);
-      }
-    }
 
     setCurrentItems(processedItems);
     return processedItems;

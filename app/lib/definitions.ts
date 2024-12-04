@@ -1,5 +1,6 @@
 import { QueryResultRow } from '@vercel/postgres';
 import { DefaultSession } from 'next-auth';
+import { JWT as NextAuthJWT } from 'next-auth/jwt';
 
 export interface User extends QueryResultRow {
   id: string;
@@ -18,8 +19,9 @@ declare module 'next-auth' {
       isAdmin?: boolean;
     } & DefaultSession['user'];
     accessToken?: string;
-    onedriveFolderId?: string;
+    onedrive_folder_id?: string | null;
     error?: string;
+    lastFolderScan?: number;
   }
 
   interface User {
@@ -27,6 +29,7 @@ declare module 'next-auth' {
     name: string;
     email: string;
     isAdmin?: boolean;
+    onedrive_folder_id: string | null;
   }
 }
 
@@ -35,8 +38,9 @@ declare module 'next-auth/jwt' {
     userId: string;
     isAdmin?: boolean;
     accessToken?: string;
-    onedriveFolderId?: string;
+    onedrive_folder_id?: string | null;
     error?: string;
+    lastFolderScan?: number;
   }
 }
 
@@ -68,6 +72,31 @@ export interface FolderReference {
   id: string;
   name: string;
   driveId: string;
+}
+
+export interface FileActivity {
+  id?: string;
+  folder_id: string;
+  folder_name: string;
+  file_id: string;
+  file_name: string;
+  action_type: 'added' | 'modified' | 'deleted';
+  created_at: string;
+  user_id?: string;
+}
+
+export interface ExtendedUser extends Omit<User, 'onedrive_folder_id'> {
+  isAdmin?: boolean;
+  onedrive_folder_id: string | null;
+}
+
+export interface ExtendedJWT extends NextAuthJWT {
+  userId: string;
+  isAdmin?: boolean;
+  onedrive_folder_id?: string | null;
+  accessToken?: string;
+  lastFolderScan?: number;
+  error?: string;
 }
 
 
