@@ -19,8 +19,21 @@ const FolderContent = React.memo(({ fetchItems, onFileClick, onDownload, rootDri
     rootFolderName,
     setCurrentItems,
     setCurrentFolderId,
-    setFolderPath
+    setFolderPath,
+    currentFolderId  // Add this
   } = useFolderContext();
+
+  // Effect for syncing folder contents
+  React.useEffect(() => {
+    const currentFolder = folderPath[folderPath.length - 1];
+    if (currentFolder?.id && folderPath.length > 1 && currentFolder.id !== currentFolderId) {
+      const fetchCurrentFolderContents = async () => {
+        const items = await fetchItems(currentFolder.id);
+        setCurrentItems(items);
+      };
+      fetchCurrentFolderContents();
+    }
+  }, [folderPath, currentFolderId, fetchItems, setCurrentItems]);
 
   const getIconPath = (folderName: string): string => {
     switch (folderName) {
@@ -52,6 +65,7 @@ const FolderContent = React.memo(({ fetchItems, onFileClick, onDownload, rootDri
   const getThumbUrl = (item: DriveItem) => {
     return item.thumbnails?.[0]?.large?.url;
   };
+
   const isPDF = (item: DriveItem) => {
     return item.file?.mimeType === 'application/pdf' || 
            item.name.toLowerCase().endsWith('.pdf');
@@ -63,15 +77,17 @@ const FolderContent = React.memo(({ fetchItems, onFileClick, onDownload, rootDri
       const newFolder: FolderReference = {
         id: folderId,
         name: folderName,
-        driveId: rootDriveId  // Make sure to always include rootDriveId
+        driveId: rootDriveId
       };
+      
       setFolderPath(prevPath => {
-        // Check if we're already in this folder to prevent duplicates
-        if (prevPath.some(folder => folder.id === folderId)) {
-          return prevPath;
+        const currentPath = [...prevPath];
+        if (!currentPath.some(folder => folder.id === folderId)) {
+          currentPath.push(newFolder);
         }
-        return [...prevPath, newFolder];
+        return currentPath;
       });
+      
       const items = await fetchItems(folderId);
       setCurrentItems(items);
     }
@@ -80,29 +96,29 @@ const FolderContent = React.memo(({ fetchItems, onFileClick, onDownload, rootDri
   const handleBackClick = React.useCallback(async (e: React.MouseEvent) => {
     e.preventDefault();
     
-    console.log('Current folder path:', folderPath);
-  
+    // We know the first item in folderPath is always the root
+    const rootFolder = folderPath[0];
+    
     if (folderPath.length > 1) {
       try {
-        // Remove duplicates from path first
-        const uniquePath = folderPath.filter((folder, index, self) =>
-          index === self.findIndex(f => f.id === folder.id)
-        );
+        // Get current folder's parent
+        const newPath = folderPath.slice(0, -1);
         
-        // Remove the current folder from the path
-        const newPath = [...uniquePath];
-        newPath.pop();
-        
-        // Get the parent folder
-        const parentFolder = newPath[newPath.length - 1];
-        
-        console.log('Navigating to:', parentFolder);
-        
-        // Update states
-        setFolderPath(newPath);
-        setCurrentFolderId(parentFolder.id);
-        const items = await fetchItems(parentFolder.id);
-        setCurrentItems(items);
+        // If going back would take us to root
+        if (newPath.length === 1) {
+          // Ensure we only show root content
+          setFolderPath([rootFolder]);
+          setCurrentFolderId(rootFolder.id);
+          const items = await fetchItems(rootFolder.id);
+          setCurrentItems(items);
+        } else {
+          // Going back to an intermediate folder
+          const parentFolder = newPath[newPath.length - 1];
+          setFolderPath(newPath);
+          setCurrentFolderId(parentFolder.id);
+          const items = await fetchItems(parentFolder.id);
+          setCurrentItems(items);
+        }
       } catch (error) {
         console.error('Error during back navigation:', error);
       }
@@ -117,7 +133,7 @@ const FolderContent = React.memo(({ fetchItems, onFileClick, onDownload, rootDri
     });
   }, [currentItems]);
 
-  const isRootFolder = folderPath.length <= 1;
+  const showBackButton = folderPath.length > 1;
 
   if (isLoading) {
     return (
@@ -136,46 +152,38 @@ const FolderContent = React.memo(({ fetchItems, onFileClick, onDownload, rootDri
     );
   }
 
-  console.log('Current state:', {
-    rootFolderName,
-    folderPath,
-    isRootFolder,
-    currentItems
-  });
-
   return (
     <main className="flex-1 flex flex-col min-w-0 w-full bg-white">
       <div className="flex justify-between items-center p-6 border-b border-black">
-  <div className="flex flex-1 items-center">
-    <h1 className="text-2xl font-bold">
-      {isRootFolder ? (rootFolderName || 'Root Folder') : folderPath[folderPath.length - 1]?.name}
-    </h1>
-    <div className="ml-4 text-sm text-gray-500">
-  {/* Show root folder name only if we're not in root */}
-  {!isRootFolder && rootFolderName && (
-    <span>{rootFolderName}</span>
-  )}
-  {/* Filter out any empty or duplicate paths before mapping */}
-  {folderPath
-    .slice(1) // Skip the root folder since we handled it above
-    .filter(folder => folder.name && folder.name !== rootFolderName) // Filter out empty names and duplicates
-    .map((folder: FolderReference, index: number) => (
-      <span key={folder.id}>
-        {" > "}
-        {folder.name}
-      </span>
-    ))}
-</div>
-  </div>
-  {!isRootFolder && (
-  <button 
-    onClick={(e) => handleBackClick(e)}
-    className="ml-4 px-4 py-2 bg-yellow-100 text-black rounded hover:bg-blue-600 hover:text-white transition-colors duration-200"
-  >
-    Back
-  </button>
-)}
-</div>
+        <div className="flex flex-1 items-center">
+          <h1 className="text-2xl font-bold">
+            {folderPath.length <= 1 ? (rootFolderName || 'Root Folder') : folderPath[folderPath.length - 1]?.name}
+          </h1>
+          <div className="ml-4 text-sm text-gray-500">
+            {folderPath.length > 1 && rootFolderName && (
+              <span>{rootFolderName}</span>
+            )}
+            {folderPath
+              .slice(1)
+              .filter(folder => folder.name && folder.name !== rootFolderName)
+              .map((folder: FolderReference, index: number) => (
+                <span key={folder.id}>
+                  {" > "}
+                  {folder.name}
+                </span>
+              ))}
+          </div>
+        </div>
+        {showBackButton && (
+          <button 
+            onClick={(e) => handleBackClick(e)}
+            className="ml-4 px-4 py-2 bg-yellow-100 text-black rounded hover:bg-blue-600 hover:text-white transition-colors duration-200"
+          >
+            Back
+          </button>
+        )}
+      </div>
+
       <div className="flex-1 overflow-y-auto p-6">
         <ul className="space-y-2 w-full">
           {sortedItems.map((item, index) => (
@@ -206,21 +214,21 @@ const FolderContent = React.memo(({ fetchItems, onFileClick, onDownload, rootDri
                       className="flex items-center space-x-2 text-left flex-grow"
                     >
                       {isImage(item) && getThumbUrl(item) ? (
-  <img 
-    src={getThumbUrl(item)} 
-    alt={item.name} 
-    className="w-10 h-10 object-cover rounded"
-  />
-) : (
-  isPDF(item) ? (
-    <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" 
-            d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-    </svg>
-  ) : (
-    <span role="img" aria-label="File">📄</span>
-  )
-)}
+                        <img 
+                          src={getThumbUrl(item)} 
+                          alt={item.name} 
+                          className="w-10 h-10 object-cover rounded"
+                        />
+                      ) : (
+                        isPDF(item) ? (
+                          <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" 
+                                  d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                        ) : (
+                          <span role="img" aria-label="File">📄</span>
+                        )
+                      )}
                       <span>{item.name}</span>
                     </button>
                     <button

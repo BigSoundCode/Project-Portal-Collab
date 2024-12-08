@@ -8,7 +8,8 @@ import UserName from './UserName';
 interface SidebarProps {
   rootFolders: DriveItem[];
   fetchItems: (folderId: string, isInitialLoad?: boolean) => Promise<DriveItem[]>;
-  isLoading?: boolean; // Add this
+  isLoading?: boolean;
+  rootDriveId: string | null;  // Add this
 }
 
 
@@ -73,18 +74,22 @@ const FolderList = React.memo(({ folders, onFolderClick, currentFolderId }: {
 
 FolderList.displayName = 'FolderList';
 
-const Sidebar = React.memo(({ rootFolders, fetchItems }: SidebarProps) => {
-  const { currentFolderId, setCurrentFolderId, setCurrentItems, setFolderPath, rootFolderName } = useFolderContext();
+const Sidebar = React.memo(({ rootFolders, fetchItems, rootDriveId }: SidebarProps) => {
+  const { currentFolderId, setCurrentFolderId, setCurrentItems, setFolderPath, rootFolderName, folderPath } = useFolderContext();
 
   const handleRootFolderClick = React.useCallback(async (id: string, name: string) => {
+    const rootFolder = folderPath[0]; // Get the stored root folder
+    
     setCurrentFolderId(id);
     const items = await fetchItems(id);
     setCurrentItems(items);
+    
+    // Set path maintaining the original root folder
     setFolderPath([
-      { id, name: rootFolderName, driveId: '' },
-      { id, name, driveId: '' }
+      rootFolder,  // Keep original root
+      { id, name, driveId: rootFolder.driveId }
     ]);
-  }, [fetchItems, setCurrentFolderId, setCurrentItems, setFolderPath, rootFolderName]);
+  }, [fetchItems, setCurrentFolderId, setCurrentItems, setFolderPath, folderPath]);
 
   return (
     <aside className="w-64 flex-shrink-0 bg-white border-r border-black p-4">

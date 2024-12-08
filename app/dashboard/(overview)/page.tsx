@@ -233,6 +233,7 @@ const fetchItems = useCallback(async (folderId: string, isInitialLoad: boolean =
         
         setRootDriveId(driveId);
         setRootFolderName(folderName);
+        // Set initial path with just the root folder
         setFolderPath([{
           id: folderIdToUse,
           name: folderName,
@@ -409,6 +410,7 @@ useEffect(() => {
         rootFolders={rootFolders} 
         fetchItems={fetchItems}
         isLoading={isFetching}
+        rootDriveId={rootDriveId}  // Add this
       />
       <FolderContent 
         fetchItems={fetchItems}
