@@ -45,6 +45,23 @@ export default function Header() {
     }
   }, [session?.user?.id]);
 
+  const handleNotificationClick = async () => {
+    // First toggle the panel visibility
+    setIsNotificationPanelOpen(!isNotificationPanelOpen);
+    
+    // If we're opening the panel, mark notifications as read
+    if (!isNotificationPanelOpen && session?.user?.id) {
+      try {
+        await fetch(`/api/notifications?userId=${session.user.id}`, {
+          method: 'POST'
+        });
+        setNotificationCount(0);
+      } catch (error) {
+        console.error('Error marking notifications as read:', error);
+      }
+    }
+  };
+
   return (
     <header style={{ backgroundColor: '#042540', color: '#c09f4a' }}>
       <div style={{ display: 'flex', alignItems: 'center', paddingRight: '10px'}}>
@@ -64,26 +81,26 @@ export default function Header() {
             </Link>
           )}
           <button 
-  style={{ paddingLeft: '10px', paddingRight: '10px', position: 'relative' }}
-  onClick={() => setIsNotificationPanelOpen(!isNotificationPanelOpen)}
->
-  <Image src="/notifications.png" alt="Notifications" width={30} height={30}/>
-  {notificationCount > 0 && (
-    <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-      {notificationCount}
-    </span>
-  )}
-</button>
+            style={{ paddingLeft: '10px', paddingRight: '10px', position: 'relative' }}
+            onClick={handleNotificationClick}
+          >
+            <Image src="/notifications.png" alt="Notifications" width={30} height={30}/>
+            {notificationCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                {notificationCount}
+              </span>
+            )}
+          </button>
           <NotificationPanel 
             isOpen={isNotificationPanelOpen}
             onClose={() => setIsNotificationPanelOpen(false)}
             notifications={notifications}
           />
           <Link href="/account/password">
-  <button style={{ paddingLeft: '10px', paddingRight: '10px' }}>
-    <Image src="/keys.png" alt="Settings" width={30} height={30} />
-  </button>
-</Link>
+            <button style={{ paddingLeft: '10px', paddingRight: '10px' }}>
+              <Image src="/keys.png" alt="Settings" width={30} height={30} />
+            </button>
+          </Link>
         </div>
       </div>
     </header>

@@ -62,7 +62,7 @@ export default function LoginForm() {
           budget, permit info, progress photos, schedules and more.
         </p>
         <h2 className="mb-3 text-xl text-white">
-          Please provide your email address to continue.
+          Please provide your email address and password to continue.
         </h2>
         <div className="w-full">
           <div>

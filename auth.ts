@@ -2,6 +2,7 @@ import NextAuth, { NextAuthOptions, Session, User } from 'next-auth';
 import CredentialsProvider from "next-auth/providers/credentials";
 import { authenticateUser } from "@/app/lib/auth-actions";
 import { ExtendedJWT, ExtendedUser } from '@/app/lib/definitions';
+import { sql } from '@vercel/postgres';
 
 async function getAzureAccessToken() {
   const tokenEndpoint = `https://login.microsoftonline.com/${process.env.TENANT_ID}/oauth2/v2.0/token`;
@@ -59,6 +60,8 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
+          console.log('Authorized user:', user); // Add this log
+
           // Convert to standard User type that NextAuth expects
           return {
             id: user.id,
@@ -75,6 +78,27 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    async signIn({ user }) {
+      if (!user?.id) return true;
+      
+      try {
+        // Record login time in UTC
+        await sql`
+          INSERT INTO user_logins (user_id, login_time)
+          VALUES (
+            ${user.id}::uuid, 
+            (SELECT NOW() AT TIME ZONE 'UTC')
+          );
+        `;
+        
+        return true;
+      } catch (error) {
+        console.error('Error recording login time:', error);
+        return true; // Still allow login even if recording fails
+      }
+    },
+  
+
     async jwt({ token, user }): Promise<ExtendedJWT> {
       if (user) {
         token.userId = user.id;
@@ -91,6 +115,7 @@ export const authOptions: NextAuthOptions = {
       }
       return token as ExtendedJWT;
     },
+
     async session({ session, token }): Promise<Session> {
       if (session.user) {
         session.user.id = token.userId;

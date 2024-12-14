@@ -126,34 +126,59 @@ function DashboardContent() {
   };
 
   // Inside DashboardContent component, before fetchItems
-const fetchFolderContents = async (folderId: string, folderName: string) => {
-  const encodedFolderId = encodeURIComponent(folderId);
-  const apiUrl = `/api/onedrive/folder/${encodedFolderId}`;
-  
-  const response = await fetch(apiUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch folder contents: ${response.status}`);
-  }
-
-  const data = await response.json();
-  
-  // Track files in this folder
-  for (const item of data.children || []) {
-    if (!item.folder) {  // If it's a file, not a folder
-      await trackFileActivity({
-        folder_id: folderId,
-        folder_name: folderName,
-        file_id: item.id,
-        file_name: item.name,
-        action_type: 'added',
-        created_at: item.createdDateTime
-      });
+  const fetchFolderContents = async (folderId: string, folderName: string) => {
+    const encodedFolderId = encodeURIComponent(folderId);
+    const apiUrl = `/api/onedrive/folder/${encodedFolderId}`;
+    
+    console.log(`Fetching contents for folder: ${folderName} (${folderId})`);
+    
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch folder contents: ${response.status}`);
     }
-  }
-
-  // Return the items for further processing
-  return data.children || [];
-};
+  
+    const data = await response.json();
+    
+    // Track files in this folder
+    for (const item of data.children || []) {
+      if (!item.folder) {  // If it's a file, not a folder
+        console.log(`Tracking file: ${item.name} in folder: ${folderName}`);
+        try {
+          const activity = {
+            folder_id: folderId,
+            folder_name: folderName,
+            file_id: item.id,
+            file_name: item.name,
+            action_type: 'added',
+            created_at: item.createdDateTime
+          };
+          
+          console.log('Sending activity:', activity);
+          
+          const response = await fetch('/api/fileActivity', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(activity)
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Failed to track file activity:', errorData);
+          } else {
+            const result = await response.json();
+            console.log('Activity tracked successfully:', result);
+          }
+        } catch (error) {
+          console.error('Error tracking file activity:', error);
+        }
+      }
+    }
+  
+    // Return the items for further processing
+    return data.children || [];
+  };
 
 const trackFileActivity = async (activity: {
   folder_id: string;
