@@ -12,7 +12,6 @@ export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const [notificationCount, setNotificationCount] = useState(0);
-  const [notifications, setNotifications] = useState([]);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
 
   const handleLogoClick = (e: React.MouseEvent) => {
@@ -22,14 +21,13 @@ export default function Header() {
     }
   };
 
-  // Fetch notifications
+  // Fetch notifications count
   useEffect(() => {
-    const fetchNotifications = async () => {
+    const fetchNotificationCount = async () => {
       try {
         const response = await fetch(`/api/notifications?userId=${session?.user?.id}`);
         if (response.ok) {
           const data = await response.json();
-          setNotifications(data.notifications);
           setNotificationCount(data.count);
         }
       } catch (error) {
@@ -38,27 +36,17 @@ export default function Header() {
     };
 
     if (session?.user?.id) {
-      fetchNotifications();
+      fetchNotificationCount();
       // Refresh notifications every minute
-      const interval = setInterval(fetchNotifications, 60000);
+      const interval = setInterval(fetchNotificationCount, 60000);
       return () => clearInterval(interval);
     }
   }, [session?.user?.id]);
 
-  const handleNotificationClick = async () => {
-    // First toggle the panel visibility
+  const handleNotificationClick = () => {
     setIsNotificationPanelOpen(!isNotificationPanelOpen);
-    
-    // If we're opening the panel, mark notifications as read
-    if (!isNotificationPanelOpen && session?.user?.id) {
-      try {
-        await fetch(`/api/notifications?userId=${session.user.id}`, {
-          method: 'POST'
-        });
-        setNotificationCount(0);
-      } catch (error) {
-        console.error('Error marking notifications as read:', error);
-      }
+    if (!isNotificationPanelOpen) {
+      setNotificationCount(0); // Reset count when opening panel
     }
   };
 
@@ -94,7 +82,6 @@ export default function Header() {
           <NotificationPanel 
             isOpen={isNotificationPanelOpen}
             onClose={() => setIsNotificationPanelOpen(false)}
-            notifications={notifications}
           />
           <Link href="/account/password">
             <button style={{ paddingLeft: '10px', paddingRight: '10px' }}>
